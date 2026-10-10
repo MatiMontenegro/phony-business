@@ -165,28 +165,43 @@ export class SettingsMenu {
 
   tab_voices(b, L) {
     const v = this.game.voice;
-    b.append($('p', { class: 'shelp', text: t('naturalTip', L) }));
+    b.append($('p', { class: 'shelp', text: t('voicesPreloaded', L) }));
     b.append(this.row(t('voiceRate', L), this.slider('voices.rate', 0.7, 1.4, 0.05, (x) => x.toFixed(2) + '×')));
     b.append(this.row(t('coworkerVoices', L), this.toggle('voices.coworkers')));
+    // your own cloned voice (downloadable build): voices the character "Matías"
+    if (this.game.platform.kind !== 'artifact') {
+      b.append($('h4', { text: t('cloneTitle', L) }));
+      b.append($('p', { class: 'shelp', text: t('cloneHelp', L) }));
+      const on = $('div', { class: 'seg' }, ...[[true, t('on', L)], [false, t('off', L)]].map(([val, label]) =>
+        $('button', { 'aria-pressed': String(!!settings.get('voices.clone.on') === val), onclick: () => { settings.set('voices.clone.on', val); this.render(); } }, label)));
+      b.append(this.row(t('cloneOn', L), on));
+      if (settings.get('voices.clone.on')) {
+        const base = $('input', { type: 'text', placeholder: 'https://api… /v1', value: settings.get('voices.clone.base') || '', spellcheck: 'false' });
+        const key = $('input', { type: 'password', placeholder: t('aiKey', L), value: settings.get('voices.clone.key') || '', autocomplete: 'off' });
+        const model = $('input', { type: 'text', placeholder: t('cloneModel', L), value: settings.get('voices.clone.model') || '', spellcheck: 'false' });
+        const vid = $('input', { type: 'text', placeholder: t('cloneVoiceId', L), value: settings.get('voices.clone.voiceId') || '', spellcheck: 'false' });
+        const sync = () => {
+          settings.set('voices.clone.base', base.value.trim());
+          settings.set('voices.clone.key', key.value.trim());
+          settings.set('voices.clone.model', model.value.trim());
+          settings.set('voices.clone.voiceId', vid.value.trim());
+          this.game.voice.refreshClone && this.game.voice.refreshClone();
+        };
+        for (const i of [base, key, model, vid]) { i.addEventListener('change', sync); i.addEventListener('keydown', (e) => e.stopPropagation()); }
+        b.append($('div', { class: 'aicfg' }, base, key, model, vid));
+        b.append($('div', { class: 'btnrow left' }, $('button', { class: 'btn small', onclick: () => { sync(); this.game.voice.previewClone(L); } }, t('previewVoice', L))));
+      }
+    }
+    // the preloaded cast (read-only): listen to each character's voice
     const list = v.ranked(L);
     if (!list.length) { b.append($('p', { class: 'shelp warn', text: t('noVoices', L) })); return; }
-    const over = settings.get('voices.overrides') || {};
-    const people = [...MARKS.map((m) => ({ id: m.id, name: m.name, gender: m.voice.gender, p: m.voice })), { id: 'boss', name: t('boss', L), gender: 'male', p: { pitch: 0.6, rate: 1.05 } }];
+    b.append($('h4', { text: t('theCast', L) }));
     const grid = $('div', { class: 'voices' });
+    const people = [...MARKS.filter((m) => !m.scambaiter).map((m) => ({ id: m.id, name: m.name, gender: m.voice.gender, p: m.voice })), { id: 'boss', name: t('boss', L), gender: 'male', p: { pitch: 0.6, rate: 1.05 } }];
     for (const who of people) {
-      const sel = $('select', { 'aria-label': who.name });
-      sel.append($('option', { value: '', text: t('autoVoice', L) }));
-      for (const x of list) sel.append($('option', { value: x.voiceURI, text: `${x.name} (${x.lang})` }));
-      sel.value = over[who.id] || '';
-      sel.addEventListener('change', () => {
-        const o = { ...(settings.get('voices.overrides') || {}) };
-        if (sel.value) o[who.id] = sel.value; else delete o[who.id];
-        settings.set('voices.overrides', o);
-        v.casting.clear();
-      });
-      const play = $('button', { class: 'btn small', onclick: () => v.preview(who.id, L, who.gender, who.p) }, t('previewVoice', L));
       const cur = v.cast(who.id, L, who.gender);
-      grid.append($('div', { class: 'vrow2' }, $('div', {}, $('b', { text: who.name }), $('small', { text: cur ? cur.name : '' })), sel, play));
+      const play = $('button', { class: 'btn small', onclick: () => v.preview(who.id, L, who.gender, who.p) }, t('previewVoice', L));
+      grid.append($('div', { class: 'vrow2 ro' }, $('div', {}, $('b', { text: who.name }), $('small', { text: cur ? cur.name : '' })), play));
     }
     b.append(grid);
   }
@@ -232,6 +247,14 @@ export class SettingsMenu {
       key.hidden = sel.value === 'none' || sel.value === 'ollama';
       model.hidden = base.hidden = sel.value === 'none';
       b.append(this.row(t('aiProvider', L), $('div', { class: 'aicfg' }, sel, key, model, base)));
+      // top-up store: buy convenience token packs (+5%). Checkout opens your site.
+      b.append($('h4', { text: t('tokenStore', L) }));
+      b.append($('p', { class: 'shelp', text: t('storeNote', L) }));
+      b.append($('div', { class: 'btnrow left' }, $('button', { class: 'btn cash', onclick: () => { this.close(); this.ui.showStore(); } }, icon('coin'), ' ', t('buyTokens', L))));
+      const url = $('input', { type: 'text', placeholder: t('storeUrl', L), value: settings.get('store.url') || '', spellcheck: 'false' });
+      url.addEventListener('change', () => settings.set('store.url', url.value.trim()));
+      url.addEventListener('keydown', (e) => e.stopPropagation());
+      b.append(this.row(t('storeUrl', L), url));
     }
     // usage meter
     const s = usage.shift, tot = usage.total;

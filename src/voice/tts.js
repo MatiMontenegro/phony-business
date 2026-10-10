@@ -1,6 +1,7 @@
 // Text to speech with voice casting: every character gets its own installed
 // voice (preferring natural/neural ones), with light pitch/rate shaping.
 import { settings } from '../settings.js';
+import { CloneTTS } from './clone.js';
 
 const FEMALE = /female|woman|samantha|victoria|karen|moira|tessa|fiona|paulina|monica|mónica|helena|laura|lucia|lucía|sabina|zira|susan|catherine|kate|serena|allison|ava|joanna|salli|camila|penelope|lupe|francisca|mia|elena|elvira|dalia|maria|maría|isabel|ximena|valentina|sofia|sofía|jenny|aria|emma|libby|sonia|clara|natasha|hazel|linda|heather|nuria|salome|salomé|tania|abril|dolores|beatriz|renata|larissa|lourdes/i;
 const MALE = /\bmale\b|man\b|daniel|alex|fred|jorge|diego|juan|carlos|pablo|enrique|david|mark|james|george|tom|rishi|miguel|andres|andrés|alvaro|álvaro|tomas|tomás|gonzalo|jorge|raul|raúl|federico|mateo|guy|ryan|eric|christopher|davis|tony|brian|liam|elias|gerardo|alonso|arnau|dario|darío|emilio|esteban|nicolas|nicolás|santiago|lorenzo/i;
@@ -45,6 +46,7 @@ export class Voice {
     this.casting = new Map(); // character id -> voice
     this.speaking = false;
     this.listeners = new Set();
+    this.clone = new CloneTTS();
     if (this.synth) {
       const load = () => { this.voices = this.synth.getVoices() || []; this.casting.clear(); };
       load();
@@ -66,13 +68,8 @@ export class Voice {
 
   hasNatural(lang) { return this.ranked(lang).some((v) => quality(v) >= 5); }
 
-  // stable, distinct voice per character
+  // stable, distinct voice per character (preloaded; not user-selectable)
   cast(id, lang, gender = 'any') {
-    const over = settings.get('voices.overrides') || {};
-    if (over[id]) {
-      const v = this.voices.find((x) => x.voiceURI === over[id] || x.name === over[id]);
-      if (v) return v;
-    }
     const key = id + '|' + lang;
     if (this.casting.has(key)) return this.casting.get(key);
     const pool = this.ranked(lang);
@@ -128,6 +125,30 @@ export class Voice {
 
   preview(id, lang, gender, p) {
     this.speak(lang === 'es' ? '¡Hola! Así sueno en la llamada.' : 'Hi! This is how I sound on the call.', { id, lang, gender, ...p, priority: 3 });
+  }
+
+  // ---- cloned voice (the player's own, downloadable build) -----------------------------------
+  setCloneCtx(ctx) { if (this.clone) this.clone.setCtx(ctx); }
+  cloneReady() { return !!(this.clone && this.clone.ready); }
+  refreshClone() { if (this.clone) this.clone.refresh(); }
+
+  // speak with the cloned voice; returns true if it handled it
+  speakCloned(text, { volume = 1, onstart, onend } = {}) {
+    if (!this.cloneReady()) return false;
+    if (this.synth) this.synth.cancel();
+    this.busyPriority = 2;
+    this.setSpeaking(true);
+    this.clone.speak(text, {
+      volume: volume * (settings.get('audio.voices') ?? 1) * (settings.get('audio.master') ?? 1),
+      onstart: () => { if (onstart) onstart(); },
+      onend: () => { this.busyPriority = -1; this.setSpeaking(false); if (onend) onend(); },
+    });
+    return true;
+  }
+
+  previewClone(lang) {
+    const t = lang === 'es' ? '¡Hola! Esta es mi voz clonada en la llamada.' : 'Hi! This is my cloned voice on the call.';
+    if (!this.speakCloned(t, {})) { /* not configured */ }
   }
 
   cancel() {

@@ -85,6 +85,7 @@ export class Game {
     this.audio = new Audio();
     this.music = new HoldMusic(this.audio);
     this.voice = new Voice();
+    if (this.audio.ctx) this.voice.setCloneCtx(this.audio.ctx);
     this.mic = new Mic();
     this.ears = new Ears();
     this.calls = new Calls(this);
@@ -155,7 +156,7 @@ export class Game {
   // ---- hooks -----------------------------------------------------------------------------------
   setupHooks() {
     this.on('slacking', (k) => this.slack(k));
-    this.on('linesDown', () => this.ui && this.ui.showLinesDown());
+    this.on('linesDown', (code) => this.ui && this.ui.showLinesDown(code));
     this.on('playerSaid', (s) => this.playerSaid(s));
     this.on('fart', ({ pos }) => { if (this.net.isHost() && this.boss.char.position.distanceTo(pos) < 7) this.boss.report('fart', this.net.selfId, pos); });
     this.on('puddle', (p) => { if (this.net.isHost()) this.boss.report('pee', this.net.selfId, p); else this.emitNet('slack', { k: 'pee' }); });
@@ -302,11 +303,17 @@ export class Game {
 
   // ---- voices ------------------------------------------------------------------------------
   speakMark(mark, text) {
-    this.voice.speak(speakable(text), {
-      id: mark.id, lang: this.lang, gender: mark.voice.gender, pitch: mark.voice.pitch, rate: mark.voice.rate, style: mark.voice.style, priority: 2,
-      onstart: () => { this.markSpeaking = true; },
-      onend: () => { this.markSpeaking = false; },
-    });
+    const spoken = speakable(text);
+    const onstart = () => { this.markSpeaking = true; };
+    const onend = () => { this.markSpeaking = false; };
+    // the player's own cloned voice for the dev character, when configured
+    const cloned = mark.voice.clone && this.voice.cloneReady() && this.voice.speakCloned(spoken, { volume: 1, onstart, onend });
+    if (!cloned) {
+      this.voice.speak(spoken, {
+        id: mark.id, lang: this.lang, gender: mark.voice.gender, pitch: mark.voice.pitch, rate: mark.voice.rate, style: mark.voice.style, priority: 2,
+        onstart, onend,
+      });
+    }
     if (this.ui) this.ui.subtitle(mark.name, text, 'mark');
     this.emitNet('say', { mk: mark.id, tx: String(text).slice(0, 200) });
   }
@@ -358,10 +365,11 @@ export class Game {
     this.toast(this.micMuted ? t('mutedMic', this.lang) : t('liveMic', this.lang), 'info');
   }
 
-  // push-to-talk (key or the mic button)
+  // push-to-talk (key or the mic button). Open mic is always live: the button
+  // is only a status light, and tapping it just re-checks the permission.
   micPress() {
     if (!this.micReady()) { if (this.ui) this.ui.micButton(); return; }
-    if (settings.get('mic.mode') === 'open') { this.toggleMicMute(); return; }
+    if (settings.get('mic.mode') !== 'ptt') { this.startEars(); return; }
     this.pttHeld = true;
     this.voice.cancel();
     this.startEars();
@@ -618,15 +626,19 @@ export class Game {
     this.props.update(dt);
     this.fx.update(dt);
     this.puddles.update(dt);
+    // greed: head swells + reddens with earnings (applied while talking)
+    const quota = Math.max(400, this.shift.quota || 1400);
+    const greedOf = (m) => Math.max(0, Math.min(1, (m || 0) / (quota * 0.45)));
     if (me) {
       // your avatar's mouth follows your real voice on a call
       const ms = this.micReady() && this.calls.state === 'connected';
       this.micLevel = ms ? this.mic.sample() : this.micLevel * 0.8;
       me.char.speechLevel = ms && this.ears.listening ? this.micLevel : -1;
+      me.char.greedBase = greedOf(this.money);
       me.char.update(dt);
     }
     this.boss.char.update(dt);
-    for (const r of this.remotes.values()) { r.update(dt); r.char.update(dt); }
+    for (const r of this.remotes.values()) { r.char.greedBase = greedOf(r.pr && r.pr.mo); r.update(dt); r.char.update(dt); }
     this.updateAmbient(dt);
     this.calls.update(dt);
     this.switchboard.update(dt);

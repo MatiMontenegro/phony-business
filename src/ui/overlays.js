@@ -1,8 +1,9 @@
 // Full-screen moments: the shift report (promoted / fired), the pause menu
 // and the "your line is dead" dialog when the AI runs out.
-import { $, clear, money } from './dom.js';
+import { $, clear, money, icon } from './dom.js';
 import { t } from '../i18n.js';
 import { usage } from '../ai/usage.js';
+import { PACKS, priceOf, fmtUSD, checkout, SERVICE_FEE } from '../ai/store.js';
 
 export class Overlays {
   constructor(ui, root) {
@@ -11,11 +12,39 @@ export class Overlays {
     this.end = $('div', { class: 'end', hidden: true, role: 'dialog', 'aria-modal': 'true' });
     this.menu = $('div', { class: 'modal menu', hidden: true, role: 'dialog', 'aria-modal': 'true' });
     this.dead = $('div', { class: 'modal', hidden: true, role: 'dialog', 'aria-modal': 'true' });
-    root.append(this.end, this.menu, this.dead);
+    this.store = $('div', { class: 'modal', hidden: true, role: 'dialog', 'aria-modal': 'true' });
+    root.append(this.end, this.menu, this.dead, this.store);
     this.menu.addEventListener('pointerdown', (e) => { if (e.target === this.menu) this.closeMenu(); });
+    this.store.addEventListener('pointerdown', (e) => { if (e.target === this.store) this.store.hidden = true; });
   }
 
-  get anyOpen() { return !this.end.hidden || !this.menu.hidden || !this.dead.hidden; }
+  get anyOpen() { return !this.end.hidden || !this.menu.hidden || !this.dead.hidden || !this.store.hidden; }
+
+  // the top-up store: own-API players buy convenience token packs (+5% fee)
+  showStore() {
+    const g = this.game, L = g.lang;
+    clear(this.store);
+    const cards = PACKS.map((pack) => {
+      const p = priceOf(pack);
+      return $('div', { class: 'pack' + (pack.best ? ' best' : '') },
+        pack.best ? $('span', { class: 'tag', text: L === 'es' ? 'Mejor' : 'Best' }) : null,
+        $('b', { text: (pack.tokens / 1_000_000) + 'M ' + t('tokensEst', L) }),
+        $('span', { class: 'calls', text: t('perPack', L, { n: p.calls }) }),
+        $('div', { class: 'price' }, $('span', { class: 'tot', text: fmtUSD(p.total) }),
+          $('small', { text: `${fmtUSD(p.base)} + ${Math.round(SERVICE_FEE * 100)}% = ${fmtUSD(p.fee)}` })),
+        $('button', { class: 'btn yellow', onclick: () => { if (!checkout(pack)) g.toast(t('storeSoon', L), 'info'); } }, t('storeCheckout', L)));
+    });
+    this.store.append($('div', { class: 'window store', style: { width: 'min(560px, 100%)' } },
+      $('div', { class: 'titlebar' }, $('span', { class: 'os', text: 'ScamOS' }), $('span', { class: 'line', text: t('tokenStore', L) }), $('span', { class: 'sp' }),
+        $('button', { class: 'btn small', onclick: () => { this.store.hidden = true; } }, t('done', L))),
+      $('div', { class: 'menubody' },
+        $('p', { class: 'shelp', text: t('storeHelp', L) }),
+        $('div', { class: 'packs' }, ...cards),
+        $('p', { class: 'finenote', text: t('storeNote', L) }),
+        $('button', { class: 'btn', onclick: () => { this.store.hidden = true; g.calls.continueWithBackup(); g.toast(t('backupBrain', L), 'info'); } }, t('storeContinueFree', L)))));
+    this.store.hidden = false;
+    g.input.exitLock();
+  }
 
   showEnd(result) {
     const g = this.game, L = g.lang, me = g.me, s = g.calls.stats;
@@ -47,19 +76,23 @@ export class Overlays {
 
   hideEnd() { this.end.hidden = true; }
 
-  showLinesDown() {
-    const L = this.game.lang;
+  showLinesDown(code) {
+    const g = this.game, L = g.lang;
     clear(this.dead);
+    // own-API players who ran out of credit can top up; everyone can keep the
+    // free offline brain. The store button only shows outside the artifact.
+    const canBuy = g.platform.kind !== 'artifact';
     this.dead.append($('div', { class: 'window', style: { width: 'min(460px, 100%)' } },
       $('div', { class: 'titlebar' }, $('span', { class: 'os', text: 'ScamOS' }), $('span', { class: 'line', text: t('linesDownShort', L) })),
       $('div', { class: 'menubody' },
         $('h2', { class: 'deadh', text: t('linesDownTitle', L) }),
-        $('p', { text: t('linesDownBody', L) }),
+        $('p', { text: code === 'no_credit' ? t('noCreditBody', L) : t('linesDownBody', L) }),
         $('div', { class: 'btnrow left' },
-          $('button', { class: 'btn yellow', onclick: () => { this.game.calls.continueWithBackup(); this.dead.hidden = true; } }, t('keepBackup', L)),
-          $('button', { class: 'btn', onclick: () => { this.dead.hidden = true; this.game.closePC(() => { if (this.game.me && this.game.me.mode === 'seated') this.game.me.standUp(); }); } }, t('clockOut', L))))));
+          canBuy ? $('button', { class: 'btn cash', onclick: () => { this.dead.hidden = true; this.showStore(); } }, icon('coin'), ' ', t('buyTokens', L)) : null,
+          $('button', { class: 'btn yellow', onclick: () => { g.calls.continueWithBackup(); this.dead.hidden = true; } }, t('keepBackup', L)),
+          $('button', { class: 'btn', onclick: () => { this.dead.hidden = true; g.closePC(() => { if (g.me && g.me.mode === 'seated') g.me.standUp(); }); } }, t('clockOut', L))))));
     this.dead.hidden = false;
-    this.game.input.exitLock();
+    g.input.exitLock();
   }
 
   openMenu() {

@@ -332,9 +332,11 @@ export class Rig {
     this.body = A.bodyGeometry(this.bodySpec());
     const skinBody = M.skinMaterial(L.skin, { ghost, metal: robot });
     const shirtKind = L.shirt.style === 'buttonup' || L.shirt.style === 'polo' || L.shirt.style === 'tee' ? L.shirt.style : L.shirt.style;
+    // head skin is cloned per rig so the greed tint stays on this character only
+    const headSkin = M.skinMaterial(L.skin, { head: true, ghost, metal: robot }).clone();
     this.mats = {
       skin: skinBody,
-      skinHead: M.skinMaterial(L.skin, { head: true, ghost, metal: robot }),
+      skinHead: headSkin,
       shirt: M.fabricMaterial(L.shirt.color, shirtKind, { ghost }),
       pants: M.fabricMaterial(L.pants.color, L.pants.style === 'jeans' ? 'jeans' : 'slacks', { ghost }),
       hair: M.hairMaterial(L.hairColor),
@@ -348,6 +350,8 @@ export class Rig {
       micOn: M.plainMaterial('#000000', { emissive: '#ff4d5e', emissiveIntensity: 5 }),
     };
     this.mats.inner = M.fabricMaterial(L.innerShirt || '#f6f1e3', 'buttonup', { ghost });
+    this.headMat = headSkin;
+    this.headMat._baseEmis = headSkin.emissiveIntensity || 0;
     const bodyMesh = new THREE.SkinnedMesh(this.body.geometry, [skinBody, this.mats.shirt, this.mats.pants, this.mats.inner].map((m, i) => M.regionMaterial(m, i)));
     this.addSkinned(bodyMesh);
     this.bodyMesh = bodyMesh;
@@ -976,6 +980,18 @@ export class Rig {
   }
 
   setExpression(e) { this.expression = e; }
+
+  // greed: head inflates and goes red the more the player earns, but only while
+  // they are actually talking (driven by mouthOpen). Quiet or silent -> normal.
+  setGreed(v) { this.greedTarget = Math.max(0, Math.min(1, v || 0)); }
+  applyGreed(dt) {
+    this.greed = (this.greed || 0) + ((this.greedTarget || 0) - (this.greed || 0)) * Math.min(1, dt * 9);
+    const g = this.greed;
+    const hb = this.bones.head;
+    if (hb) hb.scale.setScalar(1 + g * 0.4);
+    const m = this.headMat;
+    if (m && m.emissive) { m.emissive.setRGB(0.85 * g, 0.03 * g, 0.03 * g); m.emissiveIntensity = Math.max(m._baseEmis || 0, g * 0.8); }
+  }
 
   breathe(b) {
     this.breath = b;

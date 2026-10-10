@@ -44,7 +44,8 @@ export class OpenAIBrain {
     }
     clearTimeout(timer);
     const fail = (code) => { usage.record({ provider: this.provider, inChars, ok: false }); const e = new Error(code); e.code = code; return e; };
-    if (res.status === 429 || res.status === 402) throw fail('rate_limited');
+    if (res.status === 402) throw fail('no_credit');
+    if (res.status === 429) throw fail('rate_limited');
     if (res.status === 401 || res.status === 403) throw fail('not_granted');
     if (!res.ok) throw fail('upstream_error');
     const data = await res.json();

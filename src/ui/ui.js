@@ -19,6 +19,11 @@ export class UI {
     this.root = $('div', { class: 'ui-root' });
     document.body.append(this.root);
     this.isTouch = matchMedia('(pointer: coarse)').matches;
+    // phones are asked to rotate to landscape (CSS shows/hides this)
+    this.rotate = $('div', { class: 'rotate-gate' },
+      $('div', { class: 'rot-inner' }, $('div', { class: 'rot-phone' }), $('p', { text: t('rotate', game.lang) })));
+    document.body.append(this.rotate);
+    game.on('lang', () => { const p = this.rotate.querySelector('p'); if (p) p.textContent = t('rotate', game.lang); });
     this.labels = new Labels(this.root, game);
     this.hud = new Hud(this, this.root);
     this.desktop = new Desktop(this, this.root);
@@ -93,7 +98,8 @@ export class UI {
   removeNameTag(r) { this.labels.removeTag(r); }
   showEnd(r) { this.desktop.active && this.game.closePC(); this.overlays.showEnd(r); }
   hideEnd() { this.overlays.hideEnd(); }
-  showLinesDown() { this.overlays.showLinesDown(); }
+  showLinesDown(code) { this.overlays.showLinesDown(code); }
+  showStore() { this.overlays.showStore(); }
 
   update(dt) {
     const pcCover = this.desktop.visible;

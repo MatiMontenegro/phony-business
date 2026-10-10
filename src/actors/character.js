@@ -38,6 +38,7 @@ export class Character {
     this.getUpDur = 0.65;
     this.t = 0;
     this.talking = 0;
+    this.greedBase = 0;
     this.speechLevel = -1; // >= 0 when driven by real audio levels
     this.id = opts.id || Math.random().toString(36).slice(2, 8);
     if (opts.capsule !== false) {
@@ -104,6 +105,9 @@ export class Character {
       rig.mouthOpen *= Math.exp(-dt * 12);
     }
     rig.updateFace(dt, this.t);
+    // greedy head: inflate + redden with earnings, but only while talking
+    rig.setGreed((this.greedBase || 0) * Math.min(1, rig.mouthOpen * 1.35));
+    rig.applyGreed(dt);
     // secondary motion from the actual movement
     if (dt > 0) {
       this.velocity.copy(this.position).sub(this.lastPos).divideScalar(dt);
