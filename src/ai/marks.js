@@ -574,7 +574,10 @@ export const CHALLENGES = [
 ];
 
 // ---- helpers -------------------------------------------------------------------------------
-export const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+// \p{M} (combining marks) keeps the source and the minified bundle ASCII; a
+// ̀-ͯ range would be folded into raw non-ASCII bytes that break the
+// regex when the page is served without a charset declaration.
+export const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
 export const pick = (a, r = Math.random) => a[Math.floor(r() * a.length)];
 export const cleanCode = (s) => norm(s).replace(/[^a-z0-9]/g, '');
 export const digitsOf = (s) => String(s || '').replace(/\D/g, '');

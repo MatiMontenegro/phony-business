@@ -6,6 +6,9 @@ export default defineConfig(({ mode }) => ({
     __ARTIFACT__: JSON.stringify(mode === 'artifact'),
   },
   server: { host: true, port: 5173 },
+  // keep the bundle ASCII-only: esbuild would otherwise fold \u escapes (e.g.
+  // the combining-marks regex) into raw bytes, which break without a charset.
+  esbuild: { charset: 'ascii' },
   build: {
     target: 'es2022',
     outDir: mode === 'artifact' ? 'dist-artifact' : 'dist',
