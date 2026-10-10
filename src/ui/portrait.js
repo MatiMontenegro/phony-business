@@ -6,8 +6,8 @@ import { Rig } from '../actors/rig.js';
 import { defaultPose, solvePose, makePoseBuffer } from '../actors/skeleton.js';
 
 let R = null;
-// a friendly wave for the caller ID
-const PHONE_POSE = { headYaw: -0.2, headRoll: 0.08, headPitch: -0.04, armRRoll: -2.45, armRPitch: -0.25, elbowR: -0.85, armRYaw: 0, torsoYaw: 0.06, torsoRoll: 0.04 };
+// a friendly wave for the caller ID (upper arm out, forearm up, not twisted)
+const PHONE_POSE = { headYaw: -0.16, headRoll: 0.06, headPitch: -0.03, armRRoll: -1.3, armRPitch: -0.14, elbowR: -1.5, armRYaw: 0.12, torsoYaw: 0.05, torsoRoll: 0.03 };
 export const portraitPose = { override: null };
 const cache = new Map();
 const waiting = new Map();

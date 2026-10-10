@@ -4,7 +4,6 @@ import { Character } from './actors/character.js';
 import { pumpBuilds, buildsPending } from './actors/avatar.js';
 import { normalizeLook } from './actors/rig.js';
 import { Net, SoloTransport } from './net/net.js';
-import { pickProduct, PRODUCTS } from './ai/marks.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
@@ -49,7 +48,7 @@ export async function setupTestScene(game, ui, mode, platform) {
     });
   }
   const sb = game.switchboard;
-  const ringAt = (d, mk = 'blorvax') => { const r = { id: 'r' + d, d, mk, pr: 3, ch: 'banana', age: 0 }; sb.rings.push(r); return r; };
+  const ringAt = (d, mk = 'elvira', sc = 0) => { const r = { id: 'r' + d, d, mk, sc, ch: 'banana', age: 0 }; sb.rings.push(r); return r; };
   game.sitMe = (i = 0) => {
     const d = desks[i];
     game.me.controller.teleport(d.seat);
@@ -60,22 +59,23 @@ export async function setupTestScene(game, ui, mode, platform) {
   sb.timer = 1e9; // no random rings in tests
   if (mode === 'ring') {
     game.me.spawn(V(0.5, 0, 4.2), Math.PI);
-    ringAt(6, 'nocturna');
-    ringAt(3, 'biscuit');
+    ringAt(6, 'tito', 4);
+    ringAt(3, 'lu', 1);
   }
   if (mode === 'seated' || mode === 'pc' || mode === 'call') {
     game.sitMe(+(q.get('desk') || 1));
-    ringAt(+(q.get('desk') || 1), q.get('mark') || 'blorvax');
+    ringAt(+(q.get('desk') || 1), q.get('mark') || 'elvira', +(q.get('sc') || 2));
     await game.settle();
     game.tick(110);
     if (mode !== 'seated' || q.has('answer')) {
       game.answerAtMyDesk();
       const c = game.calls.call;
       const L = game.lang;
-      c.transcript.push({ who: 'me', text: L === 'es' ? '¡Hola! ¿Le interesa un seguro contra la luz del sol para su nave? La Luna lo recomienda.' : 'Hi! Interested in sunlight insurance for your spaceship? The Moon recommends it.' });
-      c.transcript.push({ who: 'mark', text: L === 'es' ? '¿¡La Luna!? ¡Mi prima! Bueno, bueno, tomá 40 espaciopesos. Anotá el voucher: MOON-4821.' : 'The MOON?! My cousin! Fine, take 40 space-bucks. Write down the voucher: MOON-4821.' });
-      c.trust = 74; c.patience = 81; c.mood = 'delighted';
-      game.calls.vouchers.unshift({ code: 'MOON-4821', units: 40, amount: 120, markId: 'blorvax', markName: 'Blorvax', currency: 'space-bucks', ttl: 71, callId: c.id, fake: false, used: false, expired: false });
+      c.transcript.push({ who: 'me', text: L === 'es' ? 'Hola doña Elvira, le hablo del banco. ¿Cómo anda Michi?' : 'Hi Mrs. Pereyra, I am calling from the bank. How is Michi the cat?' });
+      c.transcript.push({ who: 'mark', text: L === 'es' ? 'Ay, ¡Michi está divino! Qué amable. Mire, mi clave es... MICHI12. ¿Está bien así?' : 'Oh, Michi is lovely! How kind. Well, my password is... MICHI12. Is that right?' });
+      c.trust = 74; c.patience = 81; c.mood = 'trusting';
+      if (c.leads[0]) { c.leads[0].known = true; c.leads[0].value = 'MICHI12'; }
+      game.calls.vouchers.unshift({ code: 'TRF-4821', amount: 120, markId: 'elvira', markName: 'Doña Elvira', ttl: 71, callId: c.id, fake: false, used: false, expired: false });
       game.calls.notify();
     }
     if (mode === 'pc') {

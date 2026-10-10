@@ -89,7 +89,7 @@ export class Lobby {
     if (this.section === 'body') {
       sec.append(
         this.field(t('build', L), this.chips(BUILD_STYLES.map((x) => [x, t('b' + cap(x), L)]), () => lk.build, (v) => { lk.build = v; })),
-        this.field(t('shape', L), this.chips([[0, t('straight', L)], [1, t('curvy', L)]], () => lk.fem, (v) => { lk.fem = v; if (v) { lk.beard = null; lk.face.stubble = false; } })),
+        this.field(t('sex', L), this.chips([[0, t('male', L)], [1, t('female', L)]], () => (lk.fem ? 1 : 0), (v) => { lk.fem = v; if (v) { lk.beard = null; lk.face.stubble = false; } })),
         this.field(t('skin', L), this.swatches(SKIN_TONES, () => lk.skin, (v) => { lk.skin = v; })));
     } else if (this.section === 'face') {
       sec.append(

@@ -218,10 +218,13 @@ export class Animator {
         break;
       }
       case 'wave': {
-        r.armRRoll = -2.45; r.armRPitch = -0.2;
-        r.elbowR = -0.5 + Math.sin(t * 10) * 0.45;
-        r.headRoll = 0.08; r.torsoRoll = 0.04;
-        rate = 14;
+        // upper arm raised out to the side, forearm up, hand waving side to side
+        r.armRRoll = -1.28 + Math.sin(t * 9) * 0.16;
+        r.armRPitch = -0.12;
+        r.armRYaw = 0.1;
+        r.elbowR = -1.5;
+        r.headRoll = 0.06; r.headYaw = 0.06; r.torsoRoll = 0.03;
+        rate = 12;
         break;
       }
       case 'dance': {

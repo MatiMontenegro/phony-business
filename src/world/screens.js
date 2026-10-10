@@ -232,7 +232,7 @@ export function drawMine(d, time, L, s) {
     g.fillText(call.mark.name, x0 + 16, y0 + 70);
     g.fillStyle = C.crt;
     g.font = `17px ${F.mono}`;
-    g.fillText(call.product[L].slice(0, 44), x0 + 16, y0 + 96);
+    g.fillText(call.scenario.title[L].slice(0, 44), x0 + 16, y0 + 96);
     const bw = (ww - 48) / 2;
     bar(g, x0 + 16, y0 + 128, bw, 16, call.trust / 100, C.cash, `${L === 'es' ? 'CONFIANZA' : 'TRUST'} ${Math.round(call.trust)}`);
     bar(g, x0 + 32 + bw, y0 + 128, bw, 16, call.patience / 100, C.postit, `${L === 'es' ? 'PACIENCIA' : 'PATIENCE'} ${Math.round(call.patience)}`);
@@ -442,9 +442,9 @@ export class Screens {
       }
       d.screenTex.needsUpdate = true;
       this.next.set(d.index, this.t + rate);
-      // brighter flash while ringing
+      // a gentle ring pulse, not a white strobe
       // your own screen is dimmer so the bloom does not wash out the text
-      d.screenMat.color.setScalar((mine && g.isSeated ? 0.8 : 1.2) + (d.ringFlash || 0) * 0.9);
+      d.screenMat.color.setScalar((mine && g.isSeated ? 0.8 : 1.2) + (d.ringFlash || 0) * 0.3);
       d.led.material.emissive.set(ring ? '#ff4d5e' : d.owner ? '#ffd84d' : '#46e3a0');
     }
     // quota board

@@ -41,29 +41,32 @@ export const PC_W = 1024, PC_H = 768;
 
 const MAIL = {
   en: [
-    ['Big Phil', 'READ THIS. Phones ring at ANY desk', 'Phones ring all over the floor. Run to the one that rings, sit, and your login follows you: whatever desk you sit at is YOUR line. Missed calls make me sad. When I am sad I throw staplers.'],
-    ['Accounting', 'Vouchers or it did not happen', 'Customers do not hand you cash. When they pay they READ OUT a voucher code (like MOON-4821). Write it down and type it into Lead Registry within 90 seconds or the money evaporates. Nana Gigabyte\'s BINGO vouchers are fake. Do not type those.'],
-    ['Data Broker', 'Buying customer records, $150 each', 'If a customer tells you their absurd secret data (Galactic Security Numbers, castle vault runes...), register it in Lead Registry and sell it to me. If you remote into their PC it is usually in passwords.txt. I check, so type it right.'],
-    ['HR', 'Bathroom policy (updated)', 'Toilets and urinals are in the bathroom. Peeing on the carpet costs $25 per incident. Watering the plants is... technically allowed. Accidents cost $50 and your dignity.'],
+    ['Big Phil', 'READ THIS. Phones ring at ANY desk', 'Phones ring all over the floor. Run to the one that rings, sit, and your login follows you: whatever desk you sit at is YOUR line. There are fewer lines than people, so FIGHT for them. (I will not throw things over a missed call. Everything else, maybe.)'],
+    ['Accounting', 'Get the transfer code or it did not happen', 'On a "fee" call the customer READS OUT a confirmation code (like TRF-4821). Write it down and type it into Lead Registry within 90 seconds or the money evaporates. Grandma Nelly is a scambaiter: her codes are fake. Do not type those.'],
+    ['Data Broker', 'Buying customer records', 'When a customer reads you a (fake) code, password, Social Security or card number, register it in Lead Registry and sell it to me. Google codes, bank passwords, SSNs and cards each pay differently. If you remote into their PC it is usually in passwords.txt. I check, so type it right.'],
+    ['Awareness Office', 'This is parody — the point is the opposite', 'None of these numbers are real (we generate fake ones). After every call you get a RED FLAGS card listing the tricks that were used. In real life: a real bank, courier or office never calls to ask for your codes, passwords or card. Hang up and call the official number.'],
     ['IT', 'Remote Assist', 'Remote Assist connects to the customer\'s computer while you are on a call. Hit the green zone three times. Miss twice and they notice and get angry.'],
   ],
   es: [
-    ['Big Phil', 'LEAN ESTO. Los teléfonos suenan en CUALQUIER escritorio', 'Los teléfonos suenan por todo el piso. Corran al que suena, siéntense y su sesión los sigue: el escritorio donde se sienten es SU línea. Las llamadas perdidas me ponen triste. Cuando estoy triste tiro abrochadoras.'],
-    ['Contaduría', 'Sin voucher no pasó', 'Los clientes no te dan efectivo. Cuando pagan te DICTAN un código de voucher (tipo MOON-4821). Anotalo y escribilo en el Registro de clientes en menos de 90 segundos o la plata se evapora. Los vouchers BINGO de Nana Gigabyte son truchos. No los cargues.'],
-    ['Comprador de datos', 'Compro fichas de clientes, $150 cada una', 'Si un cliente te dice su dato secreto absurdo (Números de Seguridad Galáctica, runas de bóveda...), registralo en el Registro de clientes y vendémelo. Si entrás a su PC suele estar en claves.txt. Lo chequeo, así que escribilo bien.'],
-    ['RR. HH.', 'Política del baño (actualizada)', 'Los inodoros y mingitorios están en el baño. Mear la alfombra cuesta $25 por incidente. Regar las plantas está... técnicamente permitido. Los accidentes cuestan $50 y tu dignidad.'],
+    ['Big Phil', 'LEAN ESTO. Los teléfonos suenan en CUALQUIER escritorio', 'Los teléfonos suenan por todo el piso. Corran al que suena, siéntense y su sesión los sigue: el escritorio donde se sienten es SU línea. Hay menos líneas que gente, así que PELÉENSE por atender. (No voy a tirar cosas por una llamada perdida. Por lo demás, quizás.)'],
+    ['Contaduría', 'Sin código de transferencia no pasó', 'En una llamada de "tarifa" el cliente te DICTA un código de confirmación (tipo TRF-4821). Anotalo y cargalo en el Registro de clientes en menos de 90 segundos o la plata se evapora. La Abuela Nelly es cazaestafadores: sus códigos son truchos. No los cargues.'],
+    ['Comprador de datos', 'Compro fichas de clientes', 'Cuando un cliente te dicta un código, clave, Seguro Social o tarjeta (todos falsos), registralo en el Registro de clientes y vendémelo. Los códigos de Google, las claves de banco, los Seguros Sociales y las tarjetas pagan distinto. Si entrás a su PC suele estar en claves.txt. Lo chequeo, así que escribilo bien.'],
+    ['Oficina de Concientización', 'Esto es parodia: el punto es al revés', 'Ningún número de acá es real (generamos falsos). Después de cada llamada te damos una ficha de BANDERAS ROJAS con los trucos que se usaron. En la vida real: ningún banco, correo ni oficina de verdad te llama para pedirte códigos, claves ni la tarjeta. Cortá y llamá vos al número oficial.'],
     ['Sistemas', 'Asistencia remota', 'La Asistencia remota se conecta a la compu del cliente mientras estás en llamada. Pegale a la zona verde tres veces. Si fallás dos, se da cuenta y se enoja.'],
   ],
 };
 
 const PHOTOS = {
-  en: { reginald: 'Sir Neighs-a-Lot wearing a tiny crown.', blorvax: 'A selfie with the Moon (it is a lamp).', grandpabot: 'Grandpa-Bot at his 40th birthday. The cake is a battery.', nocturna: 'An empty mirror. Captioned "me??"', saltbeard: 'Gerald the parrot, mid-scream.', biscuit: 'A vase, seconds before Sir Biscuit pushed it.', gerald: 'A blurry orb. "Best friend (maybe)."', nana: 'Nana with a headset and three monitors. Suspicious.' },
-  es: { reginald: 'Sir Relincho con una coronita.', blorvax: 'Una selfie con la Luna (es una lámpara).', grandpabot: 'Abuelo-Bot en su cumple 40. La torta es una batería.', nocturna: 'Un espejo vacío. Dice "¿¿yo??"', saltbeard: 'Gerald el loro, gritando.', biscuit: 'Un jarrón, segundos antes de que Sir Biscuit lo tire.', gerald: 'Una esfera borrosa. "Mejor amigo (tal vez)."', nana: 'Nana con auriculares y tres monitores. Sospechoso.' },
+  en: { elvira: 'Michi the cat asleep on the keyboard.', kevo: 'A blurry gaming setup with too many LEDs.', tito: 'His taxi "La Gorda" double-parked.', mariela: 'Three kids, one is upside down.', hernan: 'His sailboat "Molar", barely afloat.', lu: 'A latte, going cold, perfectly lit.', ramon: 'Teresa the cow opening a gate.', gerardo: 'A pigeon, circled in red marker.', sofia: 'A tower of law textbooks.', walter: 'A spreadsheet, zoomed into cell B7.', pato: 'Seven rubber stamps in a row.', johnny: 'Twelve eggs and a protein tub.', matias: 'A ragdoll stuck inside the floor.', nelly: 'Nelly with a headset and three monitors. Suspicious.' },
+  es: { elvira: 'Michi el gato dormido sobre el teclado.', kevo: 'Un setup gamer borroso con demasiados LED.', tito: 'Su taxi "La Gorda" mal estacionado.', mariela: 'Tres chicos, uno está patas arriba.', hernan: 'Su velero "Muela", apenas a flote.', lu: 'Un café con leche enfriándose, bien iluminado.', ramon: 'La vaca Teresa abriendo una tranquera.', gerardo: 'Una paloma, marcada con fibrón rojo.', sofia: 'Una torre de libros de derecho.', walter: 'Una planilla, con zoom en la celda B7.', pato: 'Siete sellos en fila.', johnny: 'Doce huevos y un pote de proteína.', matias: 'Un ragdoll trabado dentro del piso.', nelly: 'Nelly con auriculares y tres monitores. Sospechoso.' },
 };
 const WALL = {
-  reginald: 'linear-gradient(160deg,#5d6475,#2c3346)', blorvax: 'linear-gradient(160deg,#46e3a0,#3b2a6b)', grandpabot: 'linear-gradient(160deg,#4a5a7a,#1a2030)', nocturna: 'linear-gradient(160deg,#5a0f2a,#120612)',
-  saltbeard: 'linear-gradient(160deg,#1f6b8a,#2a1d14)', biscuit: 'linear-gradient(160deg,#ffb36b,#c74f2a)', gerald: 'linear-gradient(160deg,#c7d2f0,#4a5378)', nana: 'linear-gradient(160deg,#c78bff,#3a2a5a)',
+  elvira: 'linear-gradient(160deg,#c78bff,#3a2a5a)', kevo: 'linear-gradient(160deg,#46e3a0,#1a1a22)', tito: 'linear-gradient(160deg,#ffd84d,#2b2550)', mariela: 'linear-gradient(160deg,#ff9f6b,#1f2a44)',
+  hernan: 'linear-gradient(160deg,#4dd6ff,#2c3a5a)', lu: 'linear-gradient(160deg,#c78bff,#e2c27a)', ramon: 'linear-gradient(160deg,#f6f1e3,#4a3a2a)', gerardo: 'linear-gradient(160deg,#2c3a5a,#1a2030)',
+  sofia: 'linear-gradient(160deg,#2c3a5a,#1f2a44)', walter: 'linear-gradient(160deg,#f6f1e3,#3a3a40)', pato: 'linear-gradient(160deg,#ff4d5e,#2b2550)', johnny: 'linear-gradient(160deg,#ff4d5e,#1a1a22)',
+  matias: 'linear-gradient(160deg,#2c3a5a,#1a1a22)', nelly: 'linear-gradient(160deg,#c78bff,#3a2a5a)',
 };
+const WALLDEF = 'linear-gradient(160deg,#4a5378,#1a2030)';
 
 const kb = (a) => keyLabel((settings.data.controls.bindings[a] || [])[0]);
 
@@ -396,12 +399,15 @@ export class Desktop {
     this.vChip = $('button', { class: 'vchip', hidden: true, onclick: () => this.openApp('leads') });
     this.holdBtn = $('button', { class: 'btn small', onclick: () => (this.calls.state === 'hold' ? this.calls.resume() : this.calls.hold()) });
     const hang = $('button', { class: 'btn hot', onclick: () => this.calls.hangUp() }, icon('hangup'), ' ', t('hangUp', L));
+    this.leadEls = c.leads.map((l) => {
+      const val = $('div', { class: 'secret locked', text: '•••• •••• ••••' });
+      return { lead: l, val, card: $('div', { class: 'card' }, $('div', { class: 'lbl', text: l.short[L] }), val) };
+    });
     const intel = $('div', { class: 'intel' },
-      $('div', { class: 'card' }, $('div', { class: 'lbl', text: t('pitch', L) }), $('div', { class: 'val', text: c.product[L] })),
+      $('div', { class: 'card pitch' }, $('div', { class: 'lbl', text: t('pitch', L) }), $('div', { class: 'val', text: c.scenario.title[L] }), $('div', { class: 'brief', text: c.scenario.brief[L] })),
       this.challengeNote, this.vChip,
-      $('div', { class: 'card' }, $('div', { class: 'lbl', text: c.mark.secret.label[L] }), $('div', { class: 'secret locked', text: '•••• •••• ••••' })),
+      ...this.leadEls.map((x) => x.card),
       $('div', { class: 'btncol' }, this.holdBtn, hang));
-    this.secretEl = intel.querySelector('.secret');
     this.phoneBody.append($('div', { class: 'callgrid' }, caller, convo, intel));
     this.lastLen = -1;
     this.updateConnected(c);
@@ -429,7 +435,7 @@ export class Desktop {
       this.transcript.scrollTop = this.transcript.scrollHeight;
     }
     this.challengeNote.classList.toggle('done', c.challengeDone);
-    if (c.secretKnown) { this.secretEl.textContent = c.mark.secret.value; this.secretEl.classList.remove('locked'); }
+    for (const x of this.leadEls || []) { if (x.lead.known) { x.val.textContent = x.lead.value; x.val.classList.remove('locked'); } }
     const open = this.calls.openVouchers.length;
     this.vChip.hidden = !open;
     this.vChip.textContent = t('pendingV', L, { n: open }) + ' →';
@@ -459,12 +465,16 @@ export class Desktop {
     const lines = c.receipt.length ? c.receipt.map((r) => $('div', { class: 'li' }, $('span', { text: r.label }), $('span', { text: money(r.amount) })))
       : [$('div', { class: 'li' }, $('span', { text: t('noSale', L) }), $('span', { text: '$0' }))];
     const pend = c.pendingAmount > 0 ? $('div', { class: 'li pend' }, $('span', { text: L === 'es' ? 'Vouchers por cobrar' : 'Vouchers to collect' }), $('span', { text: money(c.pendingAmount) })) : null;
+    const debrief = (c.debrief && c.debrief.length) ? $('div', { class: 'debrief' },
+      $('div', { class: 'dbh' }, icon('shield'), ' ', t('debriefTitle', L)),
+      ...c.debrief.map((f) => $('div', { class: 'dbrow' }, f.label ? $('b', { text: f.label }) : null, $('span', { text: f.tip }))),
+      $('div', { class: 'dbfoot', text: t('debriefFoot', L) })) : null;
     return $('div', { class: 'receiptwrap' }, $('div', { class: 'slot' }), $('div', { class: 'receipt' },
       $('h4', { text: 'Phony Business' }),
       $('div', { class: 'meta' }, (L === 'es' ? 'Turno noche ' : 'Night shift ') + g.shift.n, $('br'), time, $('br'), (L === 'es' ? 'Cliente: ' : 'Customer: ') + c.mark.name),
       $('hr'), ...lines, pend, $('hr'),
       $('div', { class: 'li tot' }, $('span', { text: t('total', L) }), $('span', { text: money(total) })),
-      $('div', { class: 'foot', text: L === 'es' ? 'Sin reembolsos. Sin remordimientos.' : 'No refunds. No regrets.' })));
+      $('div', { class: 'foot', text: L === 'es' ? 'Sin reembolsos. Sin remordimientos.' : 'No refunds. No regrets.' })), debrief);
   }
 
   // ---- Lead Registry ---------------------------------------------------------------------
@@ -637,12 +647,12 @@ export class Desktop {
     if (!c) { this.renderRemote(); return; }
     clear(this.remoteBody);
     const files = [['diary', 'file', L === 'es' ? 'diario.txt' : 'diary.txt'], ['pw', 'file', L === 'es' ? 'claves.txt' : 'passwords.txt'], ['photo', 'photo', 'IMG_0042.jpg'], ['trash', 'trash', t('recycle', L)]];
-    const desk = $('div', { class: 'desktop', style: { background: WALL[c.mark.id] || WALL.nana } });
+    const desk = $('div', { class: 'desktop', style: { background: WALL[c.mark.id] || WALLDEF } });
     for (const [id, ic, name] of files) desk.append($('button', { class: 'dicon', onclick: () => this.renderVictim(c, id) }, icon(ic), $('span', { text: name })));
     let text = null;
     if (open === 'diary') text = c.mark.diary[L];
-    if (open === 'pw') text = `${c.mark.secret.label[L]}:\n${c.mark.secret.value}\n\n${L === 'es' ? '(no se lo digas a nadie)' : '(do not tell anyone)'}`;
-    if (open === 'photo') text = (PHOTOS[L] || PHOTOS.en)[c.mark.id];
+    if (open === 'pw') text = c.leads.map((l) => `${l.label[L]}:\n${l.value}`).join('\n\n') + `\n\n${L === 'es' ? '(no se lo digas a nadie)' : '(do not tell anyone)'}`;
+    if (open === 'photo') text = (PHOTOS[L] || PHOTOS.en)[c.mark.id] || '';
     if (open === 'trash') text = L === 'es' ? 'plan_para_hacerme_rico_v7.doc\nfoto_fea_mia.jpg\nreceta_secreta_de_milanesa.txt' : 'get_rich_plan_v7.doc\nugly_photo_of_me.jpg\nsecret_meatloaf_recipe.txt';
     this.remoteBody.append($('div', { class: 'victim' }, $('div', { class: 'vbar' }, $('b', { text: c.mark.os }), $('span', { text: t('files', L) })), desk, text ? $('div', { class: 'filewin', text }) : null));
   }

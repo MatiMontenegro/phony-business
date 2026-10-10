@@ -96,7 +96,10 @@ export class Boss {
         const p = people.get(this.target.targetId);
         if (p) this.face(p.pos, dt);
         if (this.stateT <= 0) {
-          if (p && this.throwCD <= 0 && p.mode !== 'toilet' && p.mode !== 'urinal') { this.state = 'throwing'; this.stateT = 0.7; this.throwT = 0; }
+          // the boss only throws for real misbehaviour (pee, farts, slacking),
+          // never for a missed call: one agent cannot answer every ringing phone
+          const throwable = this.target && this.target.kind !== 'missed';
+          if (p && throwable && this.throwCD <= 0 && p.mode !== 'toilet' && p.mode !== 'urinal') { this.state = 'throwing'; this.stateT = 0.7; this.throwT = 0; }
           else this.state = 'patrol';
         }
         break;

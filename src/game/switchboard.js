@@ -2,7 +2,7 @@
 // decides where and who is calling; everyone hears the rings where they
 // are, and whoever sits at that desk can pick it up (logged in as themselves).
 import { TUNE } from '../config.js';
-import { MARKS, PRODUCTS, CHALLENGES, pickMark, markById } from '../ai/marks.js';
+import { MARKS, SCENARIOS, CHALLENGES, pickMark, markById, pickScenario } from '../ai/marks.js';
 import { t } from '../i18n.js';
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -21,7 +21,12 @@ export class Switchboard {
 
   get isHost() { return this.game.net.isHost(); }
 
-  maxRings() { return Math.min(TUNE.maxRings, this.game.playerCount() + 1); }
+  // fewer ringing phones than players, so answering is a scramble:
+  // 1 player -> 1, 2 -> 1, 3 -> 2, 4 -> 3, 5+ -> 3 (capped at TUNE.maxRings+1).
+  maxRings() {
+    const n = this.game.playerCount();
+    return Math.max(1, Math.min(TUNE.maxRings + 1, n - 1 || 1));
+  }
 
   ringAt(deskIndex) { return this.rings.find((r) => r.d === deskIndex && !this.mine.has(r.id)) || null; }
 
@@ -49,7 +54,7 @@ export class Switchboard {
     const d = idle.length && Math.random() < 0.5 ? idle[Math.floor(Math.random() * idle.length)] : free[Math.floor(Math.random() * free.length)].index;
     const m = pickMark(Math.random, this.lastMark);
     this.lastMark = m.id;
-    const ring = { id: uid(), d, mk: m.id, pr: Math.floor(Math.random() * PRODUCTS.length), ch: CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)].id, age: 0 };
+    const ring = { id: uid(), d, mk: m.id, sc: pickScenario(), ch: CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)].id, age: 0 };
     this.rings.push(ring);
     this.game.emit('ring', ring);
   }
@@ -111,9 +116,9 @@ export class Switchboard {
     const out = [];
     for (const a of rg.slice(0, 8)) {
       if (!Array.isArray(a)) continue;
-      const [id, d, mk, pr, ch, age] = a;
+      const [id, d, mk, sc, ch, age] = a;
       if (typeof id !== 'string' || !Number.isInteger(d) || !this.game.office.desks[d] || !markById(mk)) continue;
-      out.push({ id: id.slice(0, 8), d, mk, pr: Math.max(0, Math.min(PRODUCTS.length - 1, pr | 0)), ch: String(ch || ''), age: +age || 0 });
+      out.push({ id: id.slice(0, 8), d, mk, sc: Math.max(0, Math.min(SCENARIOS.length - 1, sc | 0)), ch: String(ch || ''), age: +age || 0 });
     }
     for (const r of out) if (!this.rings.some((x) => x.id === r.id)) this.game.emit('ring', r);
     this.rings = out;
@@ -121,7 +126,7 @@ export class Switchboard {
     for (const id of this.mine) if (!out.some((r) => r.id === id)) this.mine.delete(id);
   }
 
-  netState() { return this.rings.map((r) => [r.id, r.d, r.mk, r.pr, r.ch, Math.round(r.age)]); }
+  netState() { return this.rings.map((r) => [r.id, r.d, r.mk, r.sc, r.ch, Math.round(r.age)]); }
 
   update(dt) {
     const g = this.game;

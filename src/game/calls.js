@@ -1,9 +1,12 @@
-// Your phone line: the conversation with the mark, payment vouchers you must
-// type into the Lead Registry, customer data to register and sell, bonus
-// challenges, hold, and what happens when the AI runs out.
+// Your phone line: the conversation with the mark, the fake data you coax out
+// and the transfer receipts you type into the Lead Registry, bonus challenges,
+// hold, the red-flags debrief, and what happens when the AI runs out.
 import { TUNE } from '../config.js';
 import { t } from '../i18n.js';
-import { markById, pickMark, PRODUCTS, CHALLENGES, challengeById, makeVoucher, cleanCode, norm } from '../ai/marks.js';
+import {
+  markById, pickMark, scenarioAt, pickScenario, CHALLENGES, challengeById,
+  makeReceipt, makeData, dataThreshold, cleanCode, norm, saidValue, tacticsIn, TACTICS, DATA,
+} from '../ai/marks.js';
 import { ScriptedBrain } from '../ai/scripted.js';
 import { usage } from '../ai/usage.js';
 
@@ -31,11 +34,11 @@ export class Calls {
     this.call = null;
     this.busy = false;
     this.pending = '';
-    this.vouchers = []; // {code, units, amount, markId, markName, ttl, callId, fake, used}
-    this.heard = []; // {value, label, markName, fake, registered, sold, callId}
+    this.vouchers = []; // {code, amount, markId, markName, ttl, callId, fake, used}
+    this.heard = []; // {key, value, label, price, markName, fake, registered, sold, callId}
     this.ledger = []; // {label, amount}
     this.history = [];
-    this.stats = { calls: 0, closed: 0, earned: 0, secrets: 0, challenges: 0, scambaited: 0, expired: 0 };
+    this.stats = { calls: 0, closed: 0, earned: 0, data: 0, challenges: 0, scambaited: 0, expired: 0 };
     this.notify();
   }
 
@@ -46,28 +49,41 @@ export class Calls {
   notify() { for (const fn of this.listeners) { try { fn(this); } catch (e) { console.warn(e); } } }
   get active() { return this.state === 'connected' || this.state === 'hold'; }
 
+  // build the fake data items this call is about
+  makeLeads(mark, scenario) {
+    const want = (scenario.targets || []).filter((k) => mark.data.includes(k));
+    const keys = want.length ? want : [mark.data[0]];
+    const chosen = keys.slice(0, 2);
+    return chosen.map((key) => ({
+      key, value: makeData(mark, key), label: DATA[key].label, short: DATA[key].short,
+      price: DATA[key].price, threshold: dataThreshold(mark, key), known: false, registered: false,
+    }));
+  }
+
   // ---- picking up -----------------------------------------------------------------
   answer(ring) {
     if (this.active || this.linesDown) return false;
     const L = this.lang;
     const mark = markById(ring.mk) || pickMark();
+    const scenario = scenarioAt(ring.sc);
     let challenge = challengeById(ring.ch);
-    if (this.brain.kind === 'backup' && challenge.kind === 'llm') challenge = CHALLENGES.filter((c) => c.kind !== 'llm')[ring.pr % 7];
-    const trust = Math.round(rnd(24, 36));
+    if (this.brain.kind === 'backup' && challenge.kind === 'llm') challenge = CHALLENGES.filter((c) => c.kind !== 'llm')[ring.sc % 8];
+    const trust = Math.round(rnd(18, 30));
     this.call = {
       id: ring.id,
       mark,
       lang: L,
-      product: PRODUCTS[ring.pr] || PRODUCTS[0],
+      scenario,
       challenge,
-      budget: mark.budget[1] ? Math.round(rnd(mark.budget[0], mark.budget[1])) : 0,
+      leads: this.makeLeads(mark, scenario),
+      budget: scenario.pay && mark.wealth ? Math.round(rnd(mark.wealth[0], mark.wealth[1])) : 0,
       paidUnits: 0,
       earned: 0,
       pendingAmount: 0,
       trust,
       startTrust: trust,
       patience: 100,
-      mood: 'curious',
+      mood: 'wary',
       opener: mark.opener[L],
       history: [],
       transcript: [],
@@ -76,14 +92,15 @@ export class Calls {
       turns: 0,
       questionStreak: 0,
       hacked: false,
-      leaked: false,
-      secretKnown: false,
+      dataCount: 0,
+      firstDataAt: -1,
       challengeDone: false,
       fartAt: -99,
       events: [],
       receipt: [],
+      tacticsSeen: new Set(),
       revealed: false,
-      nextVoucher: makeVoucher(mark),
+      nextVoucher: makeReceipt(),
       deskIndex: ring.d,
     };
     this.state = 'connected';
@@ -141,7 +158,7 @@ export class Calls {
         break;
       default: break;
     }
-    // vouchers expire if nobody types them in
+    // transfer receipts expire if nobody types them in
     let changed = false;
     for (const v of this.vouchers) {
       if (v.used || v.expired) continue;
@@ -193,11 +210,12 @@ export class Calls {
     c.silence = 0;
     c.turns++;
     c.questionStreak = said.endsWith('?') ? c.questionStreak + 1 : 0;
+    for (const k of tacticsIn(said)) c.tacticsSeen.add(k);
     const events = c.events.splice(0);
     const ch = c.challenge;
     if (!c.challengeDone && ch.kind === 'fartblame' && c.elapsed - c.fartAt < 25 && ch.words.some((w) => norm(said).includes(norm(w)))) this.completeChallenge();
     if (!c.challengeDone && ch.kind === 'questions' && c.questionStreak >= ch.count) this.completeChallenge();
-    c.nextVoucher = makeVoucher(c.mark);
+    c.nextVoucher = makeReceipt();
     this.busy = true;
     this.notify();
     this.game.emit('playerSaid', said);
@@ -224,32 +242,27 @@ export class Calls {
     c.patience = r.patience;
     c.mood = r.mood;
     let line = r.say;
-    // a payment always comes with a voucher code the agent has to write down
-    if (r.pay > 0) {
-      const code = c.nextVoucher;
-      if (!cleanCode(line).includes(cleanCode(code))) line += L === 'es' ? ` Anotá el voucher: ${code}.` : ` Write down the voucher: ${code}.`;
-    }
+    // a payment always comes with a transfer code the agent has to write down
+    if (r.pay > 0 && !cleanCode(line).includes(cleanCode(c.nextVoucher))) line += L === 'es' ? ` Confirmación: ${c.nextVoucher}.` : ` Confirmation: ${c.nextVoucher}.`;
     c.transcript.push({ who: 'mark', text: line });
     if (!r.spokeEarly) this.game.speakMark(c.mark, line);
     else if (c.earlyLine && line.length > c.earlyLine.length + 4 && !line.startsWith(c.earlyLine)) this.game.speakMark(c.mark, line.slice(c.earlyLine.length).trim() || line);
     c.earlyLine = null;
     const ch = c.challenge;
-    if (!c.challengeDone && ((ch.kind === 'markSays' && ch.words.some((w) => norm(r.say).includes(w))) || (ch.kind === 'flag' && r[ch.flag]) || (ch.kind === 'llm' && r.challenge))) this.completeChallenge();
-    if (r.leak && !c.leaked) {
-      c.leaked = true;
-      c.secretKnown = true;
-      if (!c.challengeDone && ch.kind === 'nohack' && !c.hacked) this.completeChallenge();
-      this.hear(c);
-      this.game.toast(t('secretGot', L, { label: c.mark.secret.label[L] }), 'good');
+    if (!c.challengeDone && ((ch.kind === 'markSays' && ch.words.some((w) => norm(r.say).includes(norm(w)))) || (ch.kind === 'flag' && r[ch.flag]) || (ch.kind === 'llm' && r.challenge))) this.completeChallenge();
+    // data the mark just gave up (detected by value, or flagged by a brain)
+    const gave = Array.isArray(r.gave) ? r.gave : [];
+    for (const lead of c.leads) {
+      if (lead.known) continue;
+      if (gave.includes(lead.key) || saidValue(line, lead.value)) this.gotData(c, lead);
     }
     if (r.pay > 0) {
       const fake = !!c.mark.scambaiter;
       const units = fake ? r.pay : Math.min(r.pay, c.budget - c.paidUnits);
       if (units > 0) {
         if (!fake) c.paidUnits += units;
-        const amount = fake ? 0 : units * c.mark.currency.rate;
-        c.pendingAmount += amount;
-        this.vouchers.unshift({ code: c.nextVoucher, units, amount, markId: c.mark.id, markName: c.mark.name, currency: c.mark.currency[L], ttl: TUNE.voucherTTL, callId: c.id, fake, used: false, expired: false });
+        c.pendingAmount += fake ? 0 : units;
+        this.vouchers.unshift({ code: c.nextVoucher, amount: units, markId: c.mark.id, markName: c.mark.name, ttl: TUNE.voucherTTL, callId: c.id, fake, used: false, expired: false });
         this.vouchers = this.vouchers.slice(0, 12);
         if (!fake && !c.challengeDone && ch.kind === 'fast' && c.elapsed <= ch.seconds) this.completeChallenge();
         this.game.audio.notify();
@@ -261,10 +274,24 @@ export class Calls {
     this.notify();
   }
 
-  hear(c) {
-    if (this.heard.some((h) => h.callId === c.id)) return;
+  // the mark leaked one fake data item
+  gotData(c, lead) {
     const L = this.lang;
-    this.heard.unshift({ value: c.mark.secret.value, label: c.mark.secret.label[L], markName: c.mark.name, fake: !!c.mark.scambaiter, registered: false, sold: false, callId: c.id });
+    lead.known = true;
+    c.dataCount++;
+    if (c.firstDataAt < 0) c.firstDataAt = c.elapsed;
+    const ch = c.challenge;
+    if (!c.challengeDone && ch.kind === 'nohack' && !c.hacked) this.completeChallenge();
+    if (!c.challengeDone && ch.kind === 'fast' && c.elapsed <= ch.seconds) this.completeChallenge();
+    if (!c.challengeDone && ch.kind === 'twodata' && c.dataCount >= 2) this.completeChallenge();
+    this.hear(c, lead);
+    this.game.toast(t('secretGot', L, { label: lead.short[L] }), 'good');
+  }
+
+  hear(c, lead) {
+    if (this.heard.some((h) => h.callId === c.id && h.key === lead.key)) return;
+    const L = this.lang;
+    this.heard.unshift({ key: lead.key, value: lead.value, label: lead.short[L], price: lead.price, markName: c.mark.name, fake: !!c.mark.scambaiter, registered: false, sold: false, callId: c.id });
     this.notify();
   }
 
@@ -303,12 +330,12 @@ export class Calls {
       return { ok: false, msg: t('voucherFake', L), fake: true };
     }
     this.stats.earned += v.amount;
-    const label = `${v.code} · ${v.markName} (${v.units} ${v.currency})`;
+    const label = `${v.code} · ${v.markName}`;
     this.ledger.push({ label, amount: v.amount });
     if (c) {
       c.earned += v.amount;
       c.pendingAmount = Math.max(0, c.pendingAmount - v.amount);
-      c.receipt.push({ label: `${c.product[L]} (${v.units} ${v.currency})`, amount: v.amount });
+      c.receipt.push({ label: `${c.scenario.title[L]}`, amount: v.amount });
       if (!c.closed) { c.closed = true; this.stats.closed++; }
     }
     this.game.addMoney(v.amount, 'sale');
@@ -319,10 +346,11 @@ export class Calls {
   registerData(input) {
     const L = this.lang;
     const code = cleanCode(input);
-    const h = code && this.heard.find((x) => cleanCode(x.value) === code);
+    const h = code && this.heard.find((x) => cleanCode(x.value) === code || saidValue(input, x.value));
     if (!h) { this.game.audio.uiError(); return { ok: false, msg: t('dataWrong', L) }; }
     if (h.registered) return { ok: true, msg: t('registered', L, { label: h.label }), entry: h };
     h.registered = true;
+    this.stats.data++;
     this.game.audio.notify();
     this.notify();
     return { ok: true, msg: t('registered', L, { label: h.label }), entry: h };
@@ -332,7 +360,6 @@ export class Calls {
     if (!h || !h.registered || h.sold) return;
     const L = this.lang;
     h.sold = true;
-    this.stats.secrets++;
     const c = this.findCall(h.callId);
     if (h.fake) {
       this.ledger.push({ label: t('brokerFake', L), amount: -50 });
@@ -341,22 +368,31 @@ export class Calls {
       this.game.toast(t('brokerFakeToast', L), 'bad');
     } else {
       const label = t('brokerSold', L, { label: h.label });
-      this.ledger.push({ label, amount: TUNE.secretPrice });
-      if (c) c.receipt.push({ label, amount: TUNE.secretPrice });
-      this.game.addMoney(TUNE.secretPrice, 'secret');
+      this.ledger.push({ label, amount: h.price });
+      if (c) c.receipt.push({ label, amount: h.price });
+      this.game.addMoney(h.price, 'secret');
     }
     this.notify();
   }
 
   findCall(id) { return this.call && this.call.id === id ? this.call : this.history.find((c) => c.id === id) || null; }
 
+  // the educational debrief: which tactics the player used, with the real lesson
+  flags(c) {
+    const L = this.lang;
+    const out = [];
+    for (const k of c.tacticsSeen) { const tt = TACTICS[k]; if (tt && tt.tip) out.push({ label: tt.label[L], tip: tt.tip[L] }); }
+    for (const f of (c.scenario.flags[L] || [])) out.push({ tip: f });
+    return out.slice(0, 5);
+  }
+
   // ---- remote assist ---------------------------------------------------------------
   hackSucceeded() {
     const c = this.call;
     if (!c) return;
     c.hacked = true;
-    c.secretKnown = true;
-    this.hear(c);
+    const lead = c.leads.find((l) => !l.known) || c.leads[0];
+    if (lead) this.gotData(c, lead);
     this.notify();
   }
 
@@ -384,6 +420,7 @@ export class Calls {
       this.game.toast(t('baiterDodgedToast', L), 'good');
     }
     c.endedBy = by;
+    c.debrief = this.flags(c);
     this.history.unshift(c);
     this.history = this.history.slice(0, 20);
     this.state = 'wrapup';
@@ -401,9 +438,9 @@ export class Calls {
     const L = this.lang;
     const code = e && e.code;
     if (code === 'cancelled') return null;
-    if (code === 'rate_limited') {
+    if (code === 'rate_limited' || code === 'no_credit') {
       this.linesDown = true;
-      this.game.emit('linesDown');
+      this.game.emit('linesDown', code);
       c.transcript.push({ who: 'event', text: t('lineDead', L) });
       this.endCall('mark');
       return null;
@@ -428,6 +465,6 @@ export class Calls {
     this.notify();
   }
 
-  // pending vouchers worth typing in
+  // pending receipts worth typing in
   get openVouchers() { return this.vouchers.filter((v) => !v.used && !v.expired); }
 }

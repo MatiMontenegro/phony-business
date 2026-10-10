@@ -37,10 +37,11 @@ export const TUNE = {
   quotaPerExtraPlayer: 900,
   quotaGrowth: 1.35,
 
-  // switchboard: phones ring at random desks
-  ringEvery: [4, 9],
-  ringTimeout: 24,
-  maxRings: 4,
+  // switchboard: phones ring at random desks. Fewer lines than players on
+  // purpose, so people have to race each other to answer (see maxRingsFor).
+  ringEvery: [7, 13],
+  ringTimeout: 26,
+  maxRings: 2,
   silenceNudge: 24,
 
   // data entry

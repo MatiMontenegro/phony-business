@@ -735,26 +735,28 @@ export function buildOffice(scene, physics, { lang = 'en', reflector = null } = 
   const monitorLights = [];
   for (let i = 0; i < 4; i++) monitorLights.push(point('#8fa7ff', 1.5, 3.2, 0, -10, 0));
 
-  // ---- weather: rain + lightning --------------------------------------------------------------
-  const weather = { rain: 1, flash: 0, next: 12 + Math.random() * 20, onThunder: null };
+  // ---- weather: rain + distant lightning -----------------------------------------------------
+  // Kept subtle on purpose: a soft glow outside the windows, never a full-frame
+  // white flash. It is rare and gentle so it reads as a storm, not a strobe.
+  const weather = { rain: 1, flash: 0, next: 30 + Math.random() * 40, onThunder: null };
   updaters.push((t, dt) => {
     rainMat.uniforms.uTime.value = t;
     rainMat.uniforms.uRain.value = weather.rain;
     weather.next -= dt;
     if (weather.rain > 0.3 && weather.next <= 0) {
-      weather.next = 18 + Math.random() * 40;
-      weather.flash = 1;
-      weather.pulses = Math.random() < 0.6 ? 2 : 1;
-      if (weather.onThunder) weather.onThunder(0.6 + Math.random() * 0.4, 0.4 + Math.random() * 1.6);
+      weather.next = 35 + Math.random() * 55;
+      weather.flash = 0.7;
+      weather.pulses = Math.random() < 0.4 ? 2 : 1;
+      if (weather.onThunder) weather.onThunder(0.5 + Math.random() * 0.35, 0.6 + Math.random() * 1.8);
     }
     if (weather.flash > 0) {
-      weather.flash = Math.max(0, weather.flash - dt * 3.2);
-      if (weather.flash < 0.4 && weather.pulses > 1) { weather.flash = 0.85; weather.pulses--; }
+      weather.flash = Math.max(0, weather.flash - dt * 2.4);
+      if (weather.flash < 0.25 && weather.pulses > 1) { weather.flash = 0.55; weather.pulses--; }
     }
     const f = weather.flash;
-    rainMat.uniforms.uFlash.value = f;
-    moon.intensity = 0.55 + f * 5;
-    skyMat.color.setScalar(1.1 + f * 1.6);
+    rainMat.uniforms.uFlash.value = f * 0.6;
+    moon.intensity = 0.55 + f * 1.4;
+    skyMat.color.setScalar(1.1 + f * 0.5);
   });
 
   const meshes = B.finalize();
