@@ -219,10 +219,11 @@ export class Animator {
       }
       case 'wave': {
         // upper arm raised out to the side, forearm up, hand waving side to side
-        r.armRRoll = -1.28 + Math.sin(t * 9) * 0.16;
-        r.armRPitch = -0.12;
-        r.armRYaw = 0.1;
-        r.elbowR = -1.5;
+        // twist the upper arm so the elbow bends UP in the frontal plane
+        r.armRRoll = -1.4;
+        r.armRPitch = -0.15;
+        r.armRYaw = -1.45;
+        r.elbowR = -1.65 + Math.sin(t * 9) * 0.32;
         r.headRoll = 0.06; r.headYaw = 0.06; r.torsoRoll = 0.03;
         rate = 12;
         break;

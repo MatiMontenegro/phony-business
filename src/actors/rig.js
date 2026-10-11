@@ -9,7 +9,23 @@ import * as M from './materials.js';
 import { raymarch } from './sdf.js';
 
 // ---- palettes ---------------------------------------------------------------------
-export const SKIN_TONES = ['#f6d3b8', '#eec0a0', '#e0a77e', '#c98b62', '#a86d48', '#8a5537', '#6b3f28', '#4e2c1c'];
+// dark back-face shell pushed out along the normals: a cheap cartoon outline
+const _outlineMats = new Map();
+const _RED = new THREE.Color('#ff2a2a');
+function outlineMaterial(w) {
+  if (_outlineMats.has(w)) return _outlineMats.get(w);
+  const m = new THREE.MeshBasicMaterial({ color: '#1a1030', side: THREE.BackSide });
+  m.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader.replace('#include <skinning_vertex>', '#include <skinning_vertex>\n  transformed += normalize(objectNormal) * ' + w.toFixed(4) + ';');
+  };
+  m.customProgramCacheKey = () => 'outline' + w;
+  _outlineMats.set(w, m);
+  return m;
+}
+
+export const SKIN_TONES = ['#f6d3b8', '#eec0a0', '#e0a77e', '#c98b62', '#a86d48', '#6b3f28', '#ff8a3d', '#ffb347', '#ff7eb3', '#a77bff', '#5aa0ff', '#3fc7b0', '#7bd36a', '#ffd84d'];
+// vivid cartoon tones used for random looks most of the time
+export const TOON_SKINS = ['#ff8a3d', '#ffb347', '#ff7eb3', '#a77bff', '#5aa0ff', '#3fc7b0', '#7bd36a', '#ffd84d'];
 export const HAIR_COLORS = ['#1c1410', '#3b2416', '#5a3a22', '#8a5a32', '#c48a4a', '#e2c27a', '#a33a1e', '#d8d4e2', '#2e2a3a'];
 export const EYE_COLORS = ['#4a2e1a', '#6b4423', '#3f6b8a', '#4f7a4a', '#7a7a6a', '#2a1a10'];
 export const SHIRT_COLORS = ['#ff4d5e', '#ffd84d', '#46e3a0', '#8fa7ff', '#ff9f6b', '#c78bff', '#4dd6ff', '#f6f1e3', '#2c3a5a', '#8b1e2e'];
@@ -27,7 +43,7 @@ export function randomLook(r = Math.random) {
   return {
     build: pick(BUILD_STYLES, r),
     fem,
-    skin: pick(SKIN_TONES, r),
+    skin: r() < 0.7 ? pick(TOON_SKINS, r) : pick(SKIN_TONES, r),
     face: { preset: Math.floor(r() * A.FACES.length), stubble: !fem && r() < 0.3 },
     eyes: pick(EYE_COLORS, r),
     hair: pick(fem ? hairF : hairM, r),
@@ -234,6 +250,8 @@ function stripGeometry(pts, h, lean, t = 0.004) {
 export class Rig {
   constructor(look = {}, { async = false, onReady = null } = {}) {
     this.look = normalizeLook(look);
+    // cartoon bobble head (the boss keeps a slightly smaller one)
+    this.headBase = this.look.build === 'boss' ? 1.28 : 1.48;
     this.root = new THREE.Group();
     this.root.name = 'rig';
     this.root.scale.setScalar(this.look.scale);
@@ -393,6 +411,18 @@ export class Rig {
     m.frustumCulled = false;
     this.root.add(m);
     this.meshes.push(m);
+    // cartoon ink outline (inverted hull sharing the same skeleton)
+    if (!this.look.ghost) {
+      const o = new THREE.SkinnedMesh(m.geometry, outlineMaterial(m === this.headMesh ? 0.0065 : 0.0085));
+      o.bind(this.skeleton, new THREE.Matrix4());
+      o.frustumCulled = false;
+      o.castShadow = false;
+      o.receiveShadow = false;
+      o.renderOrder = -1;
+      this.root.add(o);
+      this.outlines = this.outlines || [];
+      this.outlines.push(o);
+    }
   }
 
   // ---- face ------------------------------------------------------------------------
@@ -969,7 +999,8 @@ export class Rig {
       const b = this.bones[n];
       b.position.copy(buf[n].p);
       b.quaternion.copy(buf[n].q);
-      b.scale.set(1, 1, 1);
+      if (n === 'head') b.scale.setScalar(this.headBase || 1);
+      else b.scale.set(1, 1, 1);
     }
   }
 
@@ -981,16 +1012,24 @@ export class Rig {
 
   setExpression(e) { this.expression = e; }
 
-  // greed: head inflates and goes red the more the player earns, but only while
-  // they are actually talking (driven by mouthOpen). Quiet or silent -> normal.
-  setGreed(v) { this.greedTarget = Math.max(0, Math.min(1, v || 0)); }
+  // greed + shouting: the head swells with earnings while talking, and goes
+  // red when yelling (or when a rich player talks a lot). Quiet -> normal.
+  setGreed(v) { this.inflateTarget = Math.max(0, Math.min(1, v || 0)); }
+  setFlush(v) { this.flushTarget = Math.max(0, Math.min(1, v || 0)); }
   applyGreed(dt) {
-    this.greed = (this.greed || 0) + ((this.greedTarget || 0) - (this.greed || 0)) * Math.min(1, dt * 9);
-    const g = this.greed;
+    const k = Math.min(1, dt * 9);
+    this.inflate = (this.inflate || 0) + ((this.inflateTarget || 0) - (this.inflate || 0)) * k;
+    this.flush = (this.flush || 0) + ((this.flushTarget || 0) - (this.flush || 0)) * k;
+    this.greed = this.inflate;
     const hb = this.bones.head;
-    if (hb) hb.scale.setScalar(1 + g * 0.4);
-    const m = this.headMat;
-    if (m && m.emissive) { m.emissive.setRGB(0.85 * g, 0.03 * g, 0.03 * g); m.emissiveIntensity = Math.max(m._baseEmis || 0, g * 0.8); }
+    if (hb) hb.scale.setScalar((this.headBase || 1) * (1 + this.inflate * 0.35));
+    const m = this.headMat, r = this.flush;
+    if (m && m.emissive) {
+      m._baseColor ||= m.color.clone();
+      m.color.copy(m._baseColor).lerp(_RED, r * 0.75);
+      m.emissive.setRGB(0.7 * r, 0.02 * r, 0.02 * r);
+      m.emissiveIntensity = Math.max(m._baseEmis || 0, r * 0.6);
+    }
   }
 
   breathe(b) {

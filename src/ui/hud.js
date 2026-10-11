@@ -60,6 +60,9 @@ export class Hud {
     this.gasLbl = $('div', { class: 'lbl', text: t('gas', L()) });
     this.gasEl.append(this.gasLbl);
     this.peeKey = $('div', { class: 'peekey' });
+    // pee and gas are free now (no build-up), so the meters are hidden
+    this.bladder.hidden = true;
+    this.gasEl.hidden = true;
     this.meters = $('div', { class: 'meters' }, this.bladder, this.gasEl, this.peeKey);
     this.el.append(this.meters);
     // prompts

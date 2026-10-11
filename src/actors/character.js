@@ -105,8 +105,20 @@ export class Character {
       rig.mouthOpen *= Math.exp(-dt * 12);
     }
     rig.updateFace(dt, this.t);
-    // greedy head: inflate + redden with earnings, but only while talking
-    rig.setGreed((this.greedBase || 0) * Math.min(1, rig.mouthOpen * 1.35));
+    // cartoon head bob while talking (bigger when yelling)
+    const talk = Math.min(1, rig.mouthOpen * 1.35);
+    this.shoutT = Math.max(0, (this.shoutT || 0) - dt);
+    const shout = this.shoutT > 0 ? 1 : 0;
+    if (!this.ragdoll && talk > 0.04 && rig.bones.head) {
+      const amp = 1 + shout * 0.8;
+      rig.bones.head.rotateX(Math.sin(this.t * 11) * 0.09 * talk * amp - 0.04 * shout);
+      rig.bones.head.rotateZ(Math.sin(this.t * 6.7) * 0.06 * talk * amp);
+      rig.bones.head.rotateY(Math.sin(this.t * 4.1) * 0.05 * talk);
+    }
+    // greed swells the head while talking; yelling (or a rich mouth) turns it red
+    const greed = (this.greedBase || 0) * talk;
+    rig.setGreed(greed);
+    rig.setFlush(Math.max(shout * Math.max(0.6, talk), greed * 0.6));
     rig.applyGreed(dt);
     // secondary motion from the actual movement
     if (dt > 0) {

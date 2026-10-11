@@ -227,8 +227,8 @@ export function skinMaterial(color, { head = false, ghost = false, metal = false
       roughness: 0.52,
       metalness: 0,
       vertexColors: head,
-      sheen: 0.35,
-      sheenRoughness: 0.55,
+      sheen: 0.15,
+      sheenRoughness: 0.6,
       sheenColor: new THREE.Color('#ffd2c4'),
       specularIntensity: 0.6,
       transparent: ghost,
@@ -237,7 +237,7 @@ export function skinMaterial(color, { head = false, ghost = false, metal = false
       emissive: ghost ? new THREE.Color('#5a78c0') : new THREE.Color('#000000'),
       emissiveIntensity: ghost ? 0.45 : 0,
     });
-    return patch(m, { detail: 'pores', scale: 420, amp: 0.00012, wrap: ghost ? 0 : 0.22, bleed: '#c2453a' });
+    return patch(m, { detail: 'pores', scale: 420, amp: 0.00004, wrap: ghost ? 0 : 0.3, bleed: '#c2453a' });
   });
 }
 

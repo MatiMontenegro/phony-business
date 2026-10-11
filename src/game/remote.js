@@ -112,6 +112,7 @@ export class RemotePlayer {
         st.talking = !!pr.oc;
         c.rig.setMicLive(!!pr.oc);
         if (pr.tk) c.talking = Math.max(c.talking, 0.15);
+        if (pr.tk === 2) c.shoutT = 0.35;
       } else if (this.mode === 'toilet' && s) {
         c.position.copy(s.pos); c.yaw = 0; st.state = 'toilet'; st.relief = true;
       } else if (this.mode === 'urinal' && u) {

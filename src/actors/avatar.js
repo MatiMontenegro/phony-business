@@ -368,6 +368,8 @@ const EYE = { x: 0.031, y: 0.176, z: 0.0905, r: 0.0118 };
 function faceParams(face) {
   const base = FACES[(face && face.preset) || 0] || FACES[0];
   const f = { ...base, type: (face && face.type) || 'human', eye: 1, stubble: !!(face && face.stubble) };
+  // cartoon look: big eyes, a chunky nose and a wider mouth
+  if (f.type === 'human') { f.eye = 1.34; f.nose *= 1.22; f.noseW *= 1.12; f.mouthW *= 1.1; f.ears *= 1.08; }
   const fem = (face && face.fem) || 0;
   if (fem) {
     f.fem = fem;

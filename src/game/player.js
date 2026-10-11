@@ -90,8 +90,10 @@ export class Player {
   update(dt) {
     const g = this.game, inp = g.input, c = this.char;
     const busy = this.blocked();
-    if (this.mode !== 'toilet' && this.mode !== 'urinal' && !this.peeing) this.bladder = Math.min(1, this.bladder + dt * TUNE.bladderRate * (this.mode === 'seated' ? 1 : 1.15));
-    this.gas = Math.min(1, this.gas + dt * TUNE.gasRate);
+    // free mode: pee and gas never build up or run out, and there are no
+    // accidents. Players pee and fart whenever they feel like it.
+    this.bladder = 0.6;
+    this.gas = 0.6;
     if (this.speedBoost > 0) this.speedBoost -= dt;
     if (this.isRagdoll) {
       this.stopPee();
@@ -189,7 +191,7 @@ export class Player {
     c.yaw = 0;
     c.animState.state = 'toilet';
     this.toiletT += dt;
-    const relief = this.toiletT > 0.6 && this.bladder > 0.02;
+    const relief = this.toiletT > 0.6 && this.toiletT < 0.6 + TUNE.peeDuration;
     c.animState.relief = relief;
     c.rig.setExpression(relief ? 'relief' : 'neutral');
     if (relief) {
@@ -197,7 +199,7 @@ export class Player {
       this.peeSound ||= g.audio.pee(s.pos.clone().setY(0.5), true);
       if (Math.random() < 0.5) g.fx.splash(s.pos.clone().setY(0.42).add(_v.set(0, 0, 0.05)), '#ffe46b', 1, 0.6);
     } else if (this.peeSound) { this.peeSound.stop(); this.peeSound = null; }
-    if (this.bladder <= 0.02 && this.toiletT > 1.2) this.leaveToilet(true);
+    if (this.toiletT > 1.0 + TUNE.peeDuration) this.leaveToilet(true);
     if (this.toiletT > 40 && !this.toiletWarned) { this.toiletWarned = true; g.emit('slacking', 'toilet'); }
   }
 
@@ -208,8 +210,8 @@ export class Player {
     c.animState.state = 'pee';
     c.animState.relief = true;
     c.rig.setExpression('relief');
-    this.bladder = Math.max(0, this.bladder - dt / TUNE.peeDuration);
-    if (this.bladder <= 0.01) this.leaveUrinal();
+    this.urinalT = (this.urinalT || 0) + dt;
+    if (this.urinalT > TUNE.peeDuration) this.leaveUrinal();
   }
 
   updateCouch() {
@@ -436,6 +438,7 @@ export class Player {
     this.stopPee();
     if (this.bladder < 0.05) { g.audio.blip(200, 0.08, 'triangle', 0.08); return; }
     this.mode = 'urinal';
+    this.urinalT = 0;
     this.urinal = u;
     u.occupant = g.net.selfId;
     this.controller.locked = true;

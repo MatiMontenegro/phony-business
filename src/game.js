@@ -39,6 +39,8 @@ const _w = new THREE.Vector3();
 const num = (v, lim = 30) => { const n = +v; return Number.isFinite(n) ? Math.max(-lim, Math.min(lim, n)) : 0; };
 const kb = (a) => keyLabel((settings.data.controls.bindings[a] || [])[0]);
 // codes like MOON-4821 are easier to catch when read digit by digit
+// typed shouting: exclamation marks or mostly CAPITALS
+const isShout = (s) => { const t = String(s); const letters = (t.match(/\p{L}/gu) || []).join(''); return /!{1,}/.test(t) || (letters.length >= 4 && letters === letters.toUpperCase()); };
 const speakable = (s) => String(s).replace(/\b([A-Z]{2,8})-(\d{3,5})\b/g, (_, a, d) => `${a}, ${d.split('').join(' ')}`);
 
 export class Game {
@@ -268,6 +270,7 @@ export class Game {
       const dist = this.listenerPos().distanceTo(r.char.position);
       if (dist < 7 && settings.get('voices.coworkers') !== false) this.voice.speak(tx, { id: 'cw-' + id, lang: this.lang, gender: r.look.fem ? 'female' : 'male', volume: Math.max(0.05, 1 - dist / 7) * 0.6, priority: 0 });
       r.char.talking = Math.min(4, tx.length / 14);
+      if (isShout(tx)) r.char.shoutT = r.char.talking;
     });
     n.on('tackle', (d, id) => {
       if (d.to !== n.selfId || !this.me || !Array.isArray(d.v)) return;
@@ -320,7 +323,7 @@ export class Game {
 
   playerSaid(text) {
     this.emitNet('me', { tx: String(text).slice(0, 200) });
-    if (this.me) this.me.char.talking = Math.min(4, text.length / 14);
+    if (this.me) { this.me.char.talking = Math.min(4, text.length / 14); if (isShout(text)) this.me.char.shoutT = Math.min(4, text.length / 14); }
   }
 
   bossSay(text) {
@@ -427,7 +430,7 @@ export class Game {
   // over the left shoulder, close enough to read the monitor
   seatView(d) {
     const left = _w.set(Math.cos(d.facing), 0, -Math.sin(d.facing));
-    const pos = d.screenCenter.clone().addScaledVector(d.screenNormal, 1.1).addScaledVector(left, 0.5).setY(1.5);
+    const pos = d.screenCenter.clone().addScaledVector(d.screenNormal, 1.22).addScaledVector(left, 0.66).setY(1.5);
     const look = d.screenCenter.clone().addScaledVector(left, 0.05).setY(SCREEN.y - 0.02);
     return { pos, look, fov: 42 };
   }
@@ -634,6 +637,7 @@ export class Game {
       const ms = this.micReady() && this.calls.state === 'connected';
       this.micLevel = ms ? this.mic.sample() : this.micLevel * 0.8;
       me.char.speechLevel = ms && this.ears.listening ? this.micLevel : -1;
+      if (me.char.speechLevel > 0.6) me.char.shoutT = 0.35; // yelling into the mic
       me.char.greedBase = greedOf(this.money);
       me.char.update(dt);
     }
@@ -745,7 +749,7 @@ export class Game {
       rd: me.isRagdoll ? [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2)] : null,
       oc: +(this.calls.state === 'connected'), ty: +!!c.animState.typing, x: c.rig.expression,
       ch: +(me.charge || 0).toFixed(2), pe: +!!me.peeing, wb: +(me.bladder > 0.85),
-      tk: c.speechLevel > 0.15 ? 1 : 0,
+      tk: c.speechLevel > 0.15 ? (c.shoutT > 0 ? 2 : 1) : 0,
       mo: Math.round(this.money), sn: this.shift.n,
       st: [this.calls.stats.closed, me.stats.farts, me.stats.pees, me.stats.flops],
     };

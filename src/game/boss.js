@@ -181,7 +181,7 @@ export class Boss {
     c.animState.speed = this.speed;
     c.animState.throwT = this.throwT ? Math.min(1, this.throwT / 0.6) : 0;
     c.rig.setExpression(this.anim === 'yell' || this.anim === 'throw' ? 'angry' : 'neutral');
-    if (this.anim === 'yell') c.talking = 0.2;
+    if (this.anim === 'yell') { c.talking = 0.2; c.shoutT = 0.3; }
   }
 
   netState() {
