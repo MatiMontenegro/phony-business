@@ -51,6 +51,11 @@ export class Mic {
   }
 }
 
+// One long-lived recognition session per shift. Starting a SpeechRecognition
+// is what makes the browser ask for the microphone, so we never abort it to
+// "pause" or between calls: we just ignore what it hears while gated. When the
+// browser ends a session on its own we reopen it with a growing back-off, and
+// stop for good on a permission error (no prompt loops).
 export class Ears {
   constructor() {
     const SR = typeof window !== 'undefined' ? window.SpeechRecognition || window.webkitSpeechRecognition : null;
@@ -59,32 +64,42 @@ export class Ears {
     this.listening = false;
     this.denied = false;
     this.paused = false;
-    this.wanted = false;
+    this.wanted = false;   // the game wants to hear the player right now
+    this.alive = false;    // keep the session running (until shutdown)
     this.rec = null;
     this.finalText = '';
     this.interim = '';
     this.sendTimer = null;
     this.handlers = {};
+    this.restarts = 0;
+    this.openedAt = 0;
+    this.reopenTimer = null;
   }
 
-  // continuous listening; onPartial(text) while talking, onSend(text) after a pause
   start(lang, handlers = {}) {
     if (!this.supported || this.denied) return false;
     this.handlers = handlers;
-    this.lang = lang;
     this.wanted = true;
     this.paused = false;
+    this.finalText = '';
+    this.interim = '';
+    if (this.lang !== lang && this.rec) { this.lang = lang; this.alive = false; try { this.rec.abort(); } catch { /* ignore */ } this.alive = true; this.reopen(400); return true; }
+    this.lang = lang;
+    this.alive = true;
     return this.open();
   }
 
+  get gated() { return !this.wanted || this.paused; }
+
   open() {
-    if (this.listening || !this.wanted || this.paused) return true;
+    if (this.listening || !this.alive || this.denied) return true;
     const r = new this.SR();
     r.lang = this.lang === 'es' ? 'es-AR' : 'en-US';
     r.interimResults = true;
     r.continuous = true;
     r.maxAlternatives = 1;
     r.onresult = (e) => {
+      if (this.gated) return; // heard while the mark talks or between calls
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const res = e.results[i];
@@ -97,20 +112,29 @@ export class Ears {
       this.scheduleSend();
     };
     r.onerror = (e) => {
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { this.denied = true; this.wanted = false; }
-      if (this.handlers.onError) this.handlers.onError(e.error);
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed' || e.error === 'audio-capture') {
+        this.denied = true; this.alive = false; this.wanted = false;
+      }
+      if (e.error !== 'no-speech' && e.error !== 'aborted' && this.handlers.onError) this.handlers.onError(e.error);
     };
     r.onend = () => {
       this.listening = false;
       this.rec = null;
-      // Chrome ends sessions after a while: keep the open mic open
-      if (this.wanted && !this.paused && !this.denied) setTimeout(() => this.open(), 250);
+      if (!this.alive || this.denied) return;
+      // sessions that die instantly back off (1s, 2s, 4s ... 30s) instead of looping
+      const quick = performance.now() - this.openedAt < 3000;
+      this.restarts = quick ? this.restarts + 1 : 0;
+      if (this.restarts > 6) { this.alive = false; return; }
+      this.reopen(quick ? Math.min(30000, 1000 * 2 ** (this.restarts - 1)) : 200);
     };
     try { r.start(); } catch { return false; }
+    this.openedAt = performance.now();
     this.rec = r;
     this.listening = true;
     return true;
   }
+
+  reopen(ms) { clearTimeout(this.reopenTimer); this.reopenTimer = setTimeout(() => this.open(), ms); }
 
   scheduleSend() {
     clearTimeout(this.sendTimer);
@@ -126,26 +150,31 @@ export class Ears {
     if (text && this.handlers.onSend) this.handlers.onSend(text);
   }
 
-  // stop listening while the mark talks so it does not hear itself
+  // ignore the mic while the mark talks so it does not hear itself
   pause() {
     if (this.paused) return;
     this.paused = true;
     clearTimeout(this.sendTimer);
     this.finalText = '';
     this.interim = '';
-    if (this.rec) { try { this.rec.abort(); } catch { /* ignore */ } }
   }
 
-  resume() {
-    if (!this.paused) return;
-    this.paused = false;
-    if (this.wanted) setTimeout(() => this.open(), 120);
-  }
+  resume() { this.paused = false; }
 
+  // stop listening to the player (the session itself stays open, no new prompt)
   stop(send = false) {
-    this.wanted = false;
     if (send) this.flush();
+    this.wanted = false;
     clearTimeout(this.sendTimer);
-    if (this.rec) { try { this.rec.stop(); } catch { /* ignore */ } }
+    this.finalText = '';
+    this.interim = '';
+  }
+
+  // really close it (leaving the shift / page)
+  shutdown() {
+    this.wanted = false;
+    this.alive = false;
+    clearTimeout(this.reopenTimer);
+    if (this.rec) { try { this.rec.abort(); } catch { /* ignore */ } }
   }
 }

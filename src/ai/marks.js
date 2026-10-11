@@ -501,8 +501,7 @@ export const MARKS = [
     name: `Matías Montedoodoo`,
     title: { en: `Indie game dev, coding at 3 a.m.`, es: `Desarrollador indie, programando a las 3 a.m.` },
     look: { build: 'average', skin: '#ffb347', shirt: { style: 'hoodie', color: '#2c3a5a' }, pants: { color: '#1a1a22', style: 'jeans' }, face: { preset: 0, stubble: true }, hair: 'crop', hairColor: '#3b2416', headset: true },
-    // `clone`: the player's own cloned voice (Settings > Voices), browser voice otherwise
-    voice: { gender: 'male', age: 'adult', pitch: 1.0, rate: 1.05, style: null, clone: 'mi-voz' },
+    voice: { gender: 'male', age: 'adult', pitch: 1.0, rate: 1.05, style: null },
     bio: `An indie game developer coding at 3 a.m. who answers while compiling his own party game. Distracted and enthusiastic, talks about bugs, ragdolls and playtests. Trusts anyone who loves video games or offers to playtest.`,
     quirk: { en: `Talk video games, game dev or offer to playtest his game.`, es: `Hablale de videojuegos o ofrecete a probar su juego.` },
     quirkKeys: { words: ['videojuego', 'video game', 'gamedev', 'playtest', 'probar tu juego', 'test your game', 'indie', 'steam', 'ragdoll', 'compilar', 'compile', 'programar', 'coding'] },

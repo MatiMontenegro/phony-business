@@ -34,12 +34,11 @@ export const DEFAULTS = {
   quality: null, // null: pick from the device, then auto-tune
   graphics: { reflections: true, rain: true, shake: true, fov: 60, showFps: false },
   audio: { master: 0.9, music: 0.45, sfx: 0.9, voices: 1, ambience: 0.6, musicOn: true },
-  voices: { rate: 1, coworkers: true, clone: { base: '', key: '', model: '', voiceId: '', on: false } },
+  voices: { rate: 1, coworkers: true },
   mic: { enabled: true, mode: 'open', autoSendMs: 1000 },
   controls: { bindings: DEFAULT_BINDINGS, sensitivity: 1, invertY: false, gamepad: true },
   touch: { side: 'left', size: 140, opacity: 0.8, haptics: true, force: false },
   ai: { provider: 'auto', key: '', model: '', base: '', claudeTier: 'quick' },
-  store: { url: '' },
   game: { subtitles: true, nameTags: true },
 };
 

@@ -3,7 +3,6 @@
 // service fee on top, shown clearly. Real checkout happens on the website
 // (Stripe + your backend); the game only presents the packs and opens the
 // checkout link you configure in Settings.
-import { settings } from '../settings.js';
 import { estTokens } from './prompt.js';
 
 export const SERVICE_FEE = 0.05; // 5% on top, our cut
@@ -23,10 +22,12 @@ export function priceOf(pack) {
 
 export const fmtUSD = (n) => '$' + n.toFixed(2);
 
-// opens the configured checkout (your site handles payment + crediting).
-// Returns false if no store URL is set yet.
+// Checkout page of the published app, fixed at build time (VITE_STORE_URL).
+// Your site handles payment + crediting. Returns false while it is not set.
+export const STORE_URL = (import.meta.env && import.meta.env.VITE_STORE_URL) || '';
+
 export function checkout(pack) {
-  const url = (settings.get('store.url') || '').trim();
+  const url = STORE_URL;
   if (!url) return false;
   const p = priceOf(pack);
   const sep = url.includes('?') ? '&' : '?';

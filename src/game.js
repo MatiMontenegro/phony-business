@@ -87,7 +87,6 @@ export class Game {
     this.audio = new Audio();
     this.music = new HoldMusic(this.audio);
     this.voice = new Voice();
-    if (this.audio.ctx) this.voice.setCloneCtx(this.audio.ctx);
     this.mic = new Mic();
     this.ears = new Ears();
     this.calls = new Calls(this);
@@ -115,7 +114,7 @@ export class Game {
     settings.set('lang', l);
     this.lang = l;
     for (const d of this.office.desks) if (!d.owner) this.setDeskName(d, null);
-    if (this.ears.listening || this.ears.wanted) { this.stopEars(); this.startEars(); }
+    if (this.ears.wanted) this.startEars();
     this.emit('lang', l);
   }
 
@@ -309,14 +308,10 @@ export class Game {
     const spoken = speakable(text);
     const onstart = () => { this.markSpeaking = true; };
     const onend = () => { this.markSpeaking = false; };
-    // the player's own cloned voice for the dev character, when configured
-    const cloned = this.voice.cloneReady(mark.id) && this.voice.speakCloned(spoken, { charId: mark.id, volume: 1, onstart, onend });
-    if (!cloned) {
-      this.voice.speak(spoken, {
-        id: mark.id, lang: this.lang, gender: mark.voice.gender, pitch: mark.voice.pitch, rate: mark.voice.rate, style: mark.voice.style, priority: 2,
-        onstart, onend,
-      });
-    }
+    this.voice.speak(spoken, {
+      id: mark.id, lang: this.lang, gender: mark.voice.gender, pitch: mark.voice.pitch, rate: mark.voice.rate, style: mark.voice.style, priority: 2,
+      onstart, onend,
+    });
     if (this.ui) this.ui.subtitle(mark.name, text, 'mark');
     this.emitNet('say', { mk: mark.id, tx: String(text).slice(0, 200) });
   }
@@ -636,7 +631,7 @@ export class Game {
       // your avatar's mouth follows your real voice on a call
       const ms = this.micReady() && this.calls.state === 'connected';
       this.micLevel = ms ? this.mic.sample() : this.micLevel * 0.8;
-      me.char.speechLevel = ms && this.ears.listening ? this.micLevel : -1;
+      me.char.speechLevel = ms && this.ears.listening && !this.ears.gated ? this.micLevel : -1;
       if (me.char.speechLevel > 0.6) me.char.shoutT = 0.35; // yelling into the mic
       me.char.greedBase = greedOf(this.money);
       me.char.update(dt);

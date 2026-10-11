@@ -168,45 +168,6 @@ export class SettingsMenu {
     b.append($('p', { class: 'shelp', text: t('voicesPreloaded', L) }));
     b.append(this.row(t('voiceRate', L), this.slider('voices.rate', 0.7, 1.4, 0.05, (x) => x.toFixed(2) + '×')));
     b.append(this.row(t('coworkerVoices', L), this.toggle('voices.coworkers')));
-    // your own cloned voice (downloadable build): voices the character "Matías"
-    if (this.game.platform.kind !== 'artifact') {
-      b.append($('h4', { text: t('cloneTitle', L) }));
-      b.append($('p', { class: 'shelp', text: t('cloneHelp', L) }));
-      const on = $('div', { class: 'seg' }, ...[[true, t('on', L)], [false, t('off', L)]].map(([val, label]) =>
-        $('button', { 'aria-pressed': String(!!settings.get('voices.clone.on') === val), onclick: () => { settings.set('voices.clone.on', val); this.render(); } }, label)));
-      b.append(this.row(t('cloneOn', L), on));
-      if (settings.get('voices.clone.on')) {
-        const base = $('input', { type: 'text', placeholder: 'https://api… /v1', value: settings.get('voices.clone.base') || '', spellcheck: 'false' });
-        const key = $('input', { type: 'password', placeholder: t('aiKey', L), value: settings.get('voices.clone.key') || '', autocomplete: 'off' });
-        const model = $('input', { type: 'text', placeholder: t('cloneModel', L), value: settings.get('voices.clone.model') || '', spellcheck: 'false' });
-        const sync = () => {
-          settings.set('voices.clone.base', base.value.trim());
-          settings.set('voices.clone.key', key.value.trim());
-          settings.set('voices.clone.model', model.value.trim());
-          this.game.voice.refreshClone && this.game.voice.refreshClone();
-        };
-        for (const i of [base, key, model]) { i.addEventListener('change', sync); i.addEventListener('keydown', (e) => e.stopPropagation()); }
-        b.append($('div', { class: 'aicfg' }, base, key, model));
-        // one cloned voice per character: paste the voice ID from your TTS service
-        b.append($('p', { class: 'shelp', text: t('cloneMapHelp', L) }));
-        const grid = $('div', { class: 'voices' });
-        const map = { ...(settings.get('voices.clone.voices') || {}) };
-        if (!map.matias && settings.get('voices.clone.voiceId')) map.matias = settings.get('voices.clone.voiceId');
-        for (const m of MARKS.filter((x) => !x.scambaiter)) {
-          const inp = $('input', { type: 'text', placeholder: t('cloneVoiceId', L), value: map[m.id] || '', spellcheck: 'false' });
-          inp.addEventListener('keydown', (e) => e.stopPropagation());
-          inp.addEventListener('change', () => {
-            const cur = { ...(settings.get('voices.clone.voices') || {}) };
-            if (inp.value.trim()) cur[m.id] = inp.value.trim(); else delete cur[m.id];
-            settings.set('voices.clone.voices', cur);
-            this.game.voice.refreshClone && this.game.voice.refreshClone();
-          });
-          const play = $('button', { class: 'btn small', onclick: () => { sync(); if (!this.game.voice.previewClone(L, m.id)) this.game.toast(t('cloneNotSet', L), 'info'); } }, t('previewVoice', L));
-          grid.append($('div', { class: 'vrow2 clone' }, $('b', { text: m.name }), inp, play));
-        }
-        b.append(grid);
-      }
-    }
     // the preloaded cast (read-only): listen to each character's voice
     const list = v.ranked(L);
     if (!list.length) { b.append($('p', { class: 'shelp warn', text: t('noVoices', L) })); return; }
@@ -266,10 +227,6 @@ export class SettingsMenu {
       b.append($('h4', { text: t('tokenStore', L) }));
       b.append($('p', { class: 'shelp', text: t('storeNote', L) }));
       b.append($('div', { class: 'btnrow left' }, $('button', { class: 'btn cash', onclick: () => { this.close(); this.ui.showStore(); } }, icon('coin'), ' ', t('buyTokens', L))));
-      const url = $('input', { type: 'text', placeholder: t('storeUrl', L), value: settings.get('store.url') || '', spellcheck: 'false' });
-      url.addEventListener('change', () => settings.set('store.url', url.value.trim()));
-      url.addEventListener('keydown', (e) => e.stopPropagation());
-      b.append(this.row(t('storeUrl', L), url));
     }
     // usage meter
     const s = usage.shift, tot = usage.total;

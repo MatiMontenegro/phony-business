@@ -7,7 +7,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import {
   EffectComposer, RenderPass, EffectPass, BloomEffect, SMAAEffect, SMAAPreset, ToneMappingEffect, ToneMappingMode,
   VignetteEffect, NoiseEffect, BlendFunction, HueSaturationEffect, BrightnessContrastEffect, DepthOfFieldEffect,
-  ChromaticAberrationEffect,
+  ChromaticAberrationEffect, ShaderPass,
 } from 'postprocessing';
 import { N8AOPostPass } from 'n8ao';
 import { FloorReflector } from './reflector.js';
@@ -19,6 +19,28 @@ export const QUALITY_PRESETS = {
   high: { pixelRatio: 1.5, shadows: true, shadowSize: 2048, ao: 'Low', aoHalf: true, bloom: true, smaa: true, grain: true, dof: true, reflect: 0.35, avatar: 'high' },
   ultra: { pixelRatio: 2, shadows: true, shadowSize: 4096, ao: 'Medium', aoHalf: false, bloom: true, smaa: true, grain: true, dof: true, reflect: 0.5, avatar: 'high' },
 };
+
+let _sanitize = null;
+function sanitizeMaterial() {
+  if (_sanitize) return _sanitize;
+  _sanitize = new THREE.ShaderMaterial({
+    uniforms: { inputBuffer: { value: null } },
+    vertexShader: 'varying vec2 vUv; void main() { vUv = position.xy * 0.5 + 0.5; gl_Position = vec4(position.xy, 1.0, 1.0); }',
+    fragmentShader: [
+      'uniform sampler2D inputBuffer; varying vec2 vUv;',
+      // NaN fails every comparison; tested two ways so no driver optimises it out
+      'bool bad(float x) { return isnan(x) || !(x == x); }',
+      'void main() {',
+      '  vec4 c = texture2D(inputBuffer, vUv);',
+      '  if (bad(c.r) || bad(c.g) || bad(c.b) || bad(c.a)) c = vec4(0.0, 0.0, 0.0, 1.0);',
+      // +Inf (fp16 overflow on a hot highlight) becomes a bright but finite pixel
+      '  gl_FragColor = vec4(min(max(c.rgb, vec3(0.0)), vec3(24.0)), clamp(c.a, 0.0, 1.0));',
+      '}',
+    ].join('\n'),
+    depthWrite: false, depthTest: false,
+  });
+  return _sanitize;
+}
 
 export class Renderer {
   constructor(container, opts = {}) {
@@ -98,6 +120,10 @@ export class Renderer {
       c.addPass(ao);
       this.aoPass = ao;
     }
+    // guard: a single NaN/Inf pixel (e.g. a degenerate normal) gets spread over the
+    // whole screen by the mipmap bloom and shows up as a one-frame white flash.
+    // Scrub those pixels and cap extreme highlights before any effect runs.
+    c.addPass(new ShaderPass(sanitizeMaterial(), 'inputBuffer'));
     this.dof = null;
     if (q.dof) {
       this.dof = new DepthOfFieldEffect(this.camera, { focusDistance: 1, focusRange: 0.6, bokehScale: 0, resolutionScale: 0.5 });

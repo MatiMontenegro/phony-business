@@ -112,7 +112,8 @@ uniform vec3 uBleed;
 varying vec3 vTriPos;
 varying vec3 vTriN;
 float triH(vec3 p, vec3 n) {
-  vec3 w = pow(abs(normalize(n)), vec3(4.0));
+  vec3 an = abs(n) / max(1e-5, length(n));
+  vec3 w = an * an; w *= w;
   w /= (w.x + w.y + w.z + 1e-5);
   return texture2D(uDetail, p.zy * uDetailScale).r * w.x
        + texture2D(uDetail, p.xz * uDetailScale).r * w.y
@@ -125,7 +126,10 @@ vec3 triBump(vec3 surfPos, vec3 surfNorm, float h, float amp) {
   vec3 r2 = cross(surfNorm, sx);
   float det = dot(sx, r1);
   vec3 grad = sign(det) * (dFdx(h) * amp * r1 + dFdy(h) * amp * r2);
-  return normalize(abs(det) * surfNorm - grad);
+  vec3 nn = abs(det) * surfNorm - grad;
+  float l = length(nn);
+  // degenerate derivatives (silhouettes, tiny triangles) would give NaN: keep the normal
+  return (l > 1e-12 && abs(det) > 1e-14) ? nn / l : surfNorm;
 }`;
 
 function patch(mat, opts) {
@@ -158,7 +162,7 @@ function patch(mat, opts) {
       // soft light bleed: light wraps past the terminator, tinted (skin, fabric)
       sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
   {
-    float ndv = clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
+    float ndv = clamp(dot(normal, vViewPosition / max(1e-6, length(vViewPosition))), 0.0, 1.0);
     float rim = pow(1.0 - ndv, 3.0);
     reflectedLight.indirectDiffuse += diffuseColor.rgb * uBleed * (uWrap * 0.35 + rim * uWrap);
   }`);
