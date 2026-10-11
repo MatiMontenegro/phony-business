@@ -129,16 +129,17 @@ export class Voice {
 
   // ---- cloned voice (the player's own, downloadable build) -----------------------------------
   setCloneCtx(ctx) { if (this.clone) this.clone.setCtx(ctx); }
-  cloneReady() { return !!(this.clone && this.clone.ready); }
+  cloneReady(charId = 'matias') { return !!(this.clone && this.clone.readyFor(charId)); }
   refreshClone() { if (this.clone) this.clone.refresh(); }
 
-  // speak with the cloned voice; returns true if it handled it
-  speakCloned(text, { volume = 1, onstart, onend } = {}) {
-    if (!this.cloneReady()) return false;
+  // speak with a cloned voice assigned to this character; true if handled
+  speakCloned(text, { charId = 'matias', volume = 1, onstart, onend } = {}) {
+    if (!this.cloneReady(charId)) return false;
     if (this.synth) this.synth.cancel();
     this.busyPriority = 2;
     this.setSpeaking(true);
     this.clone.speak(text, {
+      voiceId: this.clone.voiceFor(charId),
       volume: volume * (settings.get('audio.voices') ?? 1) * (settings.get('audio.master') ?? 1),
       onstart: () => { if (onstart) onstart(); },
       onend: () => { this.busyPriority = -1; this.setSpeaking(false); if (onend) onend(); },
@@ -146,14 +147,8 @@ export class Voice {
     return true;
   }
 
-  previewClone(lang) {
-    const t = lang === 'es' ? '¡Hola! Esta es mi voz clonada en la llamada.' : 'Hi! This is my cloned voice on the call.';
-    if (!this.speakCloned(t, {})) { /* not configured */ }
-  }
-
-  cancel() {
-    if (this.synth) this.synth.cancel();
-    this.busyPriority = -1;
-    this.setSpeaking(false);
+  previewClone(lang, charId = 'matias') {
+    const t = lang === 'es' ? '¡Hola! Así sueno con mi voz clonada.' : 'Hi! This is how I sound with my cloned voice.';
+    return this.speakCloned(t, { charId });
   }
 }

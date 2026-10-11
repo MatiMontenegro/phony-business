@@ -165,22 +165,18 @@ function cover(node, x, y, z, spec) {
 function bodyNodes(spec) {
   const b = { ...(BUILDS[spec.build] || BUILDS.average) };
   const fem = spec.fem || 0;
-  b.hw += 0.09 * fem; b.ww -= 0.08 * fem; b.sw -= 0.07 * fem; b.armT -= 0.06 * fem; b.nk -= 0.08 * fem;
+  b.hw += 0.05 * fem; b.ww -= 0.04 * fem; b.sw -= 0.05 * fem; b.armT -= 0.06 * fem; b.nk -= 0.08 * fem;
   const P = BI.pelvis, T = BI.torso, H = BI.head;
   const nodes = [];
   // pelvis
   nodes.push(nEll(L('pelvis', 0, -0.015, 0), [0.152 * b.hw, 0.105, 0.108 * Math.max(0.92, b.cd * 0.96)], 0, [[P, 1]], 'torso'));
-  for (const s of [1, -1]) nodes.push(nSphere(L('pelvis', 0.058 * s * b.hw, -0.045, -0.05), 0.08 * Math.min(1.15, b.hw), 0.05, [[P, 1]], 'torso'));
   nodes.push(nEll(L('pelvis', 0, 0.06, 0.018), [0.132 * b.ww, 0.085, 0.098 * b.cd], 0.05, [[P, 0.6], [T, 0.4]], 'torso'));
   // torso
   nodes.push(nEll(L('torso', 0, 0.02, 0.004), [0.128 * b.ww, 0.1, 0.096 * b.cd], 0.06, [[T, 0.8], [P, 0.2]], 'torso'));
   nodes.push(nEll(L('torso', 0, 0.19, 0), [0.15 * b.cw, 0.15, 0.108 * b.cd], 0.07, [[T, 1]], 'torso'));
   nodes.push(nCone(L('torso', -0.13 * b.sw, 0.3, -0.016), L('torso', 0.13 * b.sw, 0.3, -0.016), 0.064, 0.064, 0.06, [[T, 1]], 'torso'));
   for (const s of [1, -1]) nodes.push(nCone(L('torso', 0.035 * s, 0.355, -0.03), L('torso', 0.12 * s * b.sw, 0.318, -0.022), 0.038 * b.nk, 0.03, 0.05, [[T, 1]], 'torso'));
-  for (const s of [1, -1]) {
-    nodes.push(nSphere(L('torso', 0.066 * s * b.cw, 0.215, 0.064 * b.cd), 0.057, 0.05, [[T, 1]], 'torso'));
-    if (fem > 0.05) nodes.push(nSphere(L('torso', 0.062 * s * b.cw, 0.198, 0.074 * b.cd), 0.062 * (0.75 + 0.35 * fem), 0.045, [[T, 1]], 'torso'));
-  }
+  // cartoon: no chest/bust sculpting, a simple rounded torso
   if (b.belly > 0.01) nodes.push(nSphere(L('torso', 0, 0.035, 0.05 + 0.01 * b.belly), 0.1 * b.belly * b.ww, 0.07, [[T, 0.7], [P, 0.3]], 'torso'));
   const neck = nCone(L('torso', 0, 0.35, -0.016), L('head', 0, 0.085, -0.004), 0.06 * b.nk, 0.052 * b.nk, 0.04, null, 'torso');
   neck.boneFn = (x, y) => {
@@ -195,16 +191,13 @@ function bodyNodes(spec) {
     nodes.push(nSphere(L('uArm' + side, 0, -0.04, -0.004), 0.055 * b.armT, 0.045, [[U, 0.55], [T, 0.45]], 'shoulder', { limb: ul }));
     nodes.push(nCone(L('uArm' + side, 0, -0.035, 0), L('uArm' + side, 0, -0.268, 0), 0.046 * b.armT, 0.038 * b.armT, 0.03, [[U, 1]], 'upper', { limb: ul }));
     nodes.push(nCone(L('fArm' + side, 0, 0.0, 0), L('fArm' + side, 0, -0.236, 0), 0.042 * b.armT, 0.03, 0.03, [[F, 1]], 'fore', { limb: fl }));
-    nodes.push(nCone(L('fArm' + side, 0, -0.02, 0.004), L('fArm' + side, 0, -0.14, 0.002), 0.046 * b.armT, 0.035 * b.armT, 0.035, [[F, 1]], 'fore', { limb: fl }));
   }
   // legs
   for (const side of ['L', 'R']) {
     const Th = BI['thigh' + side], Sh = BI['shin' + side];
     const tl = limbOf('thigh' + side), sl = limbOf('shin' + side);
     nodes.push(nCone(L('thigh' + side, 0, 0.0, 0.004), L('thigh' + side, 0, -0.405, 0), 0.087 * b.legT, 0.058 * b.legT, 0.05, [[Th, 1]], 'thigh', { limb: tl }));
-    nodes.push(nCone(L('thigh' + side, 0, -0.06, 0.018), L('thigh' + side, 0, -0.33, 0.012), 0.072 * b.legT, 0.05 * b.legT, 0.04, [[Th, 1]], 'thigh', { limb: tl }));
     nodes.push(nCone(L('shin' + side, 0, 0, 0), L('shin' + side, 0, -0.39, 0), 0.055 * b.legT, 0.04, 0.035, [[Sh, 1]], 'shin', { limb: sl }));
-    nodes.push(nCone(L('shin' + side, 0, -0.05, -0.022), L('shin' + side, 0, -0.2, -0.012), 0.052 * b.legT, 0.04, 0.04, [[Sh, 1]], 'shin', { limb: sl }));
   }
   return nodes;
 }

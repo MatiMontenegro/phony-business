@@ -310,7 +310,7 @@ export class Game {
     const onstart = () => { this.markSpeaking = true; };
     const onend = () => { this.markSpeaking = false; };
     // the player's own cloned voice for the dev character, when configured
-    const cloned = mark.voice.clone && this.voice.cloneReady() && this.voice.speakCloned(spoken, { volume: 1, onstart, onend });
+    const cloned = this.voice.cloneReady(mark.id) && this.voice.speakCloned(spoken, { charId: mark.id, volume: 1, onstart, onend });
     if (!cloned) {
       this.voice.speak(spoken, {
         id: mark.id, lang: this.lang, gender: mark.voice.gender, pitch: mark.voice.pitch, rate: mark.voice.rate, style: mark.voice.style, priority: 2,

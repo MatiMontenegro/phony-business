@@ -13,20 +13,27 @@ export class CloneTTS {
   }
 
   cfg() { return settings.get('voices.clone') || {}; }
-  get ready() {
+  // the cloned-voice ID assigned to a character (or '' if none)
+  voiceFor(charId) {
     const c = this.cfg();
-    return !this.failed && !!(c.on && c.base && c.voiceId);
+    const map = c.voices || {};
+    return (map[charId] || (charId === 'matias' ? c.voiceId : '') || '').trim();
   }
+  readyFor(charId) {
+    const c = this.cfg();
+    return !this.failed && !!(c.on && c.base && this.voiceFor(charId));
+  }
+  get ready() { const c = this.cfg(); return !this.failed && !!(c.on && c.base); }
 
   setCtx(ctx) { this.ctx = ctx; }
 
-  async fetchBuffer(text) {
+  async fetchBuffer(text, voiceId) {
     const c = this.cfg();
     const base = c.base.replace(/\/$/, '');
     const res = await fetch(base + '/audio/speech', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(c.key ? { Authorization: 'Bearer ' + c.key } : {}) },
-      body: JSON.stringify({ model: c.model || 'tts-1', voice: c.voiceId, input: text.slice(0, 400), response_format: 'mp3' }),
+      body: JSON.stringify({ model: c.model || 'tts-1', voice: voiceId, input: text.slice(0, 400), response_format: 'mp3' }),
     });
     if (!res.ok) { const e = new Error('clone_' + res.status); e.code = res.status; throw e; }
     const buf = await res.arrayBuffer();
@@ -35,11 +42,12 @@ export class CloneTTS {
   }
 
   // speak and resolve when finished (so the open mic can stay paused meanwhile)
-  async speak(text, { volume = 1, onstart, onend } = {}) {
-    if (!this.ready || !this.ctx) { if (onend) onend(); return false; }
+  async speak(text, { voiceId, volume = 1, onstart, onend } = {}) {
+    if (!this.ready || !voiceId || !this.ctx) { if (onend) onend(); return false; }
     try {
-      let ab = this.cache.get(text);
-      if (!ab) { ab = await this.fetchBuffer(text); if (this.cache.size > 40) this.cache.clear(); this.cache.set(text, ab); }
+      const ck = voiceId + '|' + text;
+      let ab = this.cache.get(ck);
+      if (!ab) { ab = await this.fetchBuffer(text, voiceId); if (this.cache.size > 40) this.cache.clear(); this.cache.set(ck, ab); }
       this.stop();
       const src = this.ctx.createBufferSource();
       src.buffer = ab;

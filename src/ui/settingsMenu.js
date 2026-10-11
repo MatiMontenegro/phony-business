@@ -179,17 +179,32 @@ export class SettingsMenu {
         const base = $('input', { type: 'text', placeholder: 'https://api… /v1', value: settings.get('voices.clone.base') || '', spellcheck: 'false' });
         const key = $('input', { type: 'password', placeholder: t('aiKey', L), value: settings.get('voices.clone.key') || '', autocomplete: 'off' });
         const model = $('input', { type: 'text', placeholder: t('cloneModel', L), value: settings.get('voices.clone.model') || '', spellcheck: 'false' });
-        const vid = $('input', { type: 'text', placeholder: t('cloneVoiceId', L), value: settings.get('voices.clone.voiceId') || '', spellcheck: 'false' });
         const sync = () => {
           settings.set('voices.clone.base', base.value.trim());
           settings.set('voices.clone.key', key.value.trim());
           settings.set('voices.clone.model', model.value.trim());
-          settings.set('voices.clone.voiceId', vid.value.trim());
           this.game.voice.refreshClone && this.game.voice.refreshClone();
         };
-        for (const i of [base, key, model, vid]) { i.addEventListener('change', sync); i.addEventListener('keydown', (e) => e.stopPropagation()); }
-        b.append($('div', { class: 'aicfg' }, base, key, model, vid));
-        b.append($('div', { class: 'btnrow left' }, $('button', { class: 'btn small', onclick: () => { sync(); this.game.voice.previewClone(L); } }, t('previewVoice', L))));
+        for (const i of [base, key, model]) { i.addEventListener('change', sync); i.addEventListener('keydown', (e) => e.stopPropagation()); }
+        b.append($('div', { class: 'aicfg' }, base, key, model));
+        // one cloned voice per character: paste the voice ID from your TTS service
+        b.append($('p', { class: 'shelp', text: t('cloneMapHelp', L) }));
+        const grid = $('div', { class: 'voices' });
+        const map = { ...(settings.get('voices.clone.voices') || {}) };
+        if (!map.matias && settings.get('voices.clone.voiceId')) map.matias = settings.get('voices.clone.voiceId');
+        for (const m of MARKS.filter((x) => !x.scambaiter)) {
+          const inp = $('input', { type: 'text', placeholder: t('cloneVoiceId', L), value: map[m.id] || '', spellcheck: 'false' });
+          inp.addEventListener('keydown', (e) => e.stopPropagation());
+          inp.addEventListener('change', () => {
+            const cur = { ...(settings.get('voices.clone.voices') || {}) };
+            if (inp.value.trim()) cur[m.id] = inp.value.trim(); else delete cur[m.id];
+            settings.set('voices.clone.voices', cur);
+            this.game.voice.refreshClone && this.game.voice.refreshClone();
+          });
+          const play = $('button', { class: 'btn small', onclick: () => { sync(); if (!this.game.voice.previewClone(L, m.id)) this.game.toast(t('cloneNotSet', L), 'info'); } }, t('previewVoice', L));
+          grid.append($('div', { class: 'vrow2 clone' }, $('b', { text: m.name }), inp, play));
+        }
+        b.append(grid);
       }
     }
     // the preloaded cast (read-only): listen to each character's voice

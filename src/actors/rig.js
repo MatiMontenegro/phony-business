@@ -412,7 +412,7 @@ export class Rig {
     this.root.add(m);
     this.meshes.push(m);
     // cartoon ink outline (inverted hull sharing the same skeleton)
-    if (!this.look.ghost) {
+    if (false) {
       const o = new THREE.SkinnedMesh(m.geometry, outlineMaterial(m === this.headMesh ? 0.0065 : 0.0085));
       o.bind(this.skeleton, new THREE.Matrix4());
       o.frustumCulled = false;

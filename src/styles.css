@@ -2072,3 +2072,5 @@ textarea.notes { width: 100%; height: 100%; box-sizing: border-box; resize: none
 .btn.cash { background: #46e3a0; color: #08261a; }
 .vrow2.ro { grid-template-columns: minmax(0, 1fr) auto; }
 @media (max-width: 620px) { .packs { grid-template-columns: 1fr; } }
+.vrow2.clone { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto; align-items: center; }
+.vrow2.clone input { min-width: 0; }
