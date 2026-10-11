@@ -47,7 +47,7 @@ export function portrait(mark) {
       solvePose(P, buf);
       rig.applyPose(buf);
       rig.root.rotation.y = 0.18;
-      rig.setExpression(mark.scambaiter ? 'happy' : 'happy');
+      rig.setExpression('happy');
       rig.mouthOpen = 0.25;
       for (let i = 0; i < 20; i++) rig.updateFace(0.05, i * 0.05);
       const s = rig.look.scale || 1;

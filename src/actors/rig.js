@@ -400,8 +400,31 @@ export class Rig {
     this.buildClothes();
     this.buildHeadwear(head.meta);
     for (const e of L.extras) this.buildExtra(e, head.meta);
+    this.classifyDetail();
     this.ready = true;
     this.root.visible = true;
+  }
+
+  // Small parts (eyes, brows, teeth, buttons, badges...) are a big share of a
+  // character's draw calls but invisible from afar: they never cast shadows,
+  // and setDetail(false) moves them to layer 1, which no camera renders. Layers
+  // (not .visible) so this never fights the expression code that hides eyes.
+  classifyDetail() {
+    const core = new Set([this.bodyMesh, this.headMesh, this.hairMesh]);
+    this.detail = [];
+    this.root.traverse((o) => {
+      if (!o.isMesh || o.isSkinnedMesh || core.has(o)) return;
+      if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+      const r = o.geometry.boundingSphere.radius * Math.max(o.scale.x, o.scale.y, o.scale.z);
+      if (r < 0.07) { o.castShadow = false; this.detail.push(o); }
+    });
+    this.detailNear = true;
+  }
+
+  setDetail(near) {
+    if (!this.detail || near === this.detailNear) return;
+    this.detailNear = near;
+    for (const o of this.detail) o.layers.set(near ? 0 : 1);
   }
 
   addSkinned(m) {

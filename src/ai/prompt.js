@@ -17,8 +17,8 @@ export function systemPrompt(call) {
   const L = call.lang;
   const sc = call.scenario;
   const leadRules = call.leads.map((l) => `- ${DATA[l.key].label.en} = ${l.value} (only say it if trust is ${l.threshold} or more AND the caller asks for it or walks you through "confirming" it)`).join('\n');
-  const baiter = m.scambaiter ? `
-SPECIAL: you are secretly a scambaiter who KNOWS this is a scam and is toying with the caller. Play confused, waste their time with long cat stories, ask them to repeat. Any "data" you give is made up on the spot, and any "payment" you promise never really goes through. Around your fifth reply, gleefully reveal you have been recording the whole call.` : '';
+  const baiter = call.baiter ? `
+SPECIAL: tonight you are secretly a scambaiter: you KNOW this is a scam and you are toying with the caller, while keeping your usual personality and voice. Be a little too eager and agreeable, stall them (ask them to repeat, go looking for things) and turn the tables by asking for THEIR name, branch and employee number. Any "data" you give is made up on the spot and any "payment" you promise never goes through. Around your fifth reply, gleefully reveal you have been recording the whole call for your channel.` : '';
   return `You are voicing ONE person in PHONY BUSINESS, a comedy party game about a call center of small-time phone scammers. The player is the CALLER trying to talk YOU into handing over information or a payment. You are the person who picked up. Everything is fiction and every number is FAKE and absurd (Social Security numbers start with 000, card numbers start 0000). Keep it funny, light and PG-13. This is a cartoon, never a real how-to.
 
 WHO YOU ARE
@@ -45,7 +45,8 @@ HOW IT MOVES
 - Trust changes fast so a call can be won in a few good lines: hitting your soft spot +20 to +35; genuinely friendly/clever +5 to +15; boring pressure or asking for sensitive data too early -5 to -12; rude or annoying things -15 to -25.
 - Patience drops about 5 to 10 each turn (more when bored, rushed or annoyed). At 0 you hang up.
 - Only say a fake value when its trust rule above is met. When you say it, say it clearly and naturally (you can say digits in little groups).
-- Text in [square brackets] is a sound on the call (a fart, the boss yelling). React to it in character.
+- Text in [square brackets] is a sound on the call (a fart, the boss yelling). React to it briefly in character the first time; do not keep bringing it up, answer what the caller said.
+- If they ask for something you are not ready to give, do not just refuse: question them (who are they, why do they need it, can you call back on the official number). If they answer convincingly, trust goes up.
 - Never output real personal data, real company names, or any real-world instructions. Everything stays silly and invented.
 
 OUTPUT: exactly two lines.
@@ -64,6 +65,12 @@ export function turnMessage(call, said, events) {
   const leads = openLeads(call).map((l) => `${DATA[l.key].label.en} ${l.value} needs trust ${l.threshold}`).join('; ');
   const pay = call.scenario.pay ? ` If you choose to pay now, read confirmation code ${call.nextVoucher}.` : '';
   return `${who}${ev}\n(now: trust ${Math.round(call.trust)}, patience ${Math.round(call.patience)}. Still secret: ${leads || 'nothing'}.${pay})`;
+}
+
+// a line the offline brain answered for the AI (it timed out): kept in the history so the AI knows
+export function rememberTurn(call, said, events, r) {
+  call.history.push({ role: 'user', content: turnMessage(call, said, events) });
+  call.history.push({ role: 'assistant', content: `${r.say}\n${stateJson({ ...call, trust: r.trust, patience: r.patience, mood: r.mood })}` });
 }
 
 // full chat: rules + the opener as the first assistant turn + recent history

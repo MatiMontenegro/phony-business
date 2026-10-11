@@ -16,6 +16,8 @@ export class ClaudeBrain {
     let spoke = false;
     const ac = new AbortController();
     call.abort = ac;
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; ac.abort(); }, 30000);
     try {
       const res = await this.sample(turns, {
         modelTier: settings.get('ai.claudeTier') || 'quick',
@@ -27,6 +29,7 @@ export class ClaudeBrain {
           if (l) { spoke = true; onFirstLine(l); }
         },
       });
+      clearTimeout(timer);
       usage.record({ provider: 'claude', inChars, outChars: res.text.length });
       const r = parseReply(res.text, call);
       call.history.push({ role: 'user', content: turns[turns.length - 1].content });
@@ -34,8 +37,9 @@ export class ClaudeBrain {
       r.spokeEarly = spoke;
       return r;
     } catch (e) {
+      clearTimeout(timer);
       usage.record({ provider: 'claude', inChars, outChars: 0, ok: false });
-      const code = e && e.code ? e.code : 'upstream_error';
+      const code = timedOut ? 'timeout' : e && e.code ? e.code : 'upstream_error';
       const err = new Error(code);
       err.code = code;
       err.partial = e && e.text;

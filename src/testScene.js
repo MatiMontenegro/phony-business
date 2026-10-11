@@ -48,7 +48,7 @@ export async function setupTestScene(game, ui, mode, platform) {
     });
   }
   const sb = game.switchboard;
-  const ringAt = (d, mk = 'elvira', sc = 0) => { const r = { id: 'r' + d, d, mk, sc, ch: 'banana', age: 0 }; sb.rings.push(r); return r; };
+  const ringAt = (d, mk = 'elvira', sc = 0) => { const r = { id: 'r' + d, d, mk, sc, ch: 'banana', bt: q.has('bt') ? 1 : 0, age: 0 }; sb.rings.push(r); return r; };
   game.sitMe = (i = 0) => {
     const d = desks[i];
     game.me.controller.teleport(d.seat);

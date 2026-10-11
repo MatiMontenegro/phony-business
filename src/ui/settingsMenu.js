@@ -168,12 +168,24 @@ export class SettingsMenu {
     b.append($('p', { class: 'shelp', text: t('voicesPreloaded', L) }));
     b.append(this.row(t('voiceRate', L), this.slider('voices.rate', 0.7, 1.4, 0.05, (x) => x.toFixed(2) + '×')));
     b.append(this.row(t('coworkerVoices', L), this.toggle('voices.coworkers')));
+    // the developer's own voice model for Matías, through the Voicebox app on this computer
+    if (this.game.platform.kind !== 'artifact') {
+      const vb = this.game.voicebox;
+      const recheck = () => vb.probe().then(() => { if (this.tab === 'voices' && !this.el.hidden) this.render(); });
+      b.append($('h4', { text: t('ownTitle', L) }));
+      b.append($('p', { class: 'shelp', text: t('ownHelp', L) }));
+      b.append(this.row(t('ownOn', L), this.toggle('voices.own', (on) => { if (on && vb.state !== 'ready') recheck(); })));
+      const status = { ready: 'ownReady', missing: 'ownMissing', offline: 'ownOffline', checking: 'ownChecking', idle: 'ownChecking' }[vb.state];
+      b.append($('p', { class: 'shelp' + (vb.state === 'ready' ? '' : ' warn'), text: t(status, L) }));
+      b.append($('div', { class: 'btnrow left' }, $('button', { class: 'btn small', onclick: recheck }, t('ownRetry', L))));
+      if (vb.state === 'idle') recheck();
+    }
     // the preloaded cast (read-only): listen to each character's voice
     const list = v.ranked(L);
     if (!list.length) { b.append($('p', { class: 'shelp warn', text: t('noVoices', L) })); return; }
     b.append($('h4', { text: t('theCast', L) }));
     const grid = $('div', { class: 'voices' });
-    const people = [...MARKS.filter((m) => !m.scambaiter).map((m) => ({ id: m.id, name: m.name, gender: m.voice.gender, p: m.voice })), { id: 'boss', name: t('boss', L), gender: 'male', p: { pitch: 0.6, rate: 1.05 } }];
+    const people = [...MARKS.map((m) => ({ id: m.id, name: m.name, gender: m.voice.gender, p: m.voice })), { id: 'boss', name: t('boss', L), gender: 'male', p: { pitch: 0.6, rate: 1.05 } }];
     for (const who of people) {
       const cur = v.cast(who.id, L, who.gender);
       const play = $('button', { class: 'btn small', onclick: () => v.preview(who.id, L, who.gender, who.p) }, t('previewVoice', L));

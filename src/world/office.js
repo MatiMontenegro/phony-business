@@ -125,7 +125,8 @@ function dustMaterial(map) {
   });
 }
 
-export function buildOffice(scene, physics, { lang = 'en', reflector = null } = {}) {
+export function buildOffice(scene, physics, { lang = 'en', reflector = null, texScale = 1 } = {}) {
+  // texScale < 1 (the mobile path) stores desk screens and the skyline at lower resolution
   const root = new THREE.Group();
   root.name = 'office';
   scene.add(root);
@@ -261,7 +262,7 @@ export function buildOffice(scene, physics, { lang = 'en', reflector = null } = 
   root.add(rain);
   const breakWindows = () => { windowCollider.setEnabled(false); glass.visible = false; rain.visible = false; };
   const repairWindows = () => { windowCollider.setEnabled(true); glass.visible = true; rain.visible = true; };
-  const skyMat = new THREE.MeshBasicMaterial({ map: TX.skyline(), fog: false });
+  const skyMat = new THREE.MeshBasicMaterial({ map: TX.skyline(texScale < 1 ? 0.5 : 1), fog: false });
   const sky = new THREE.Mesh(new THREE.PlaneGeometry(90, 34), skyMat);
   sky.position.set(4, 6, -40);
   root.add(sky);
@@ -456,8 +457,8 @@ export function buildOffice(scene, physics, { lang = 'en', reflector = null } = 
     g.position.set(s.x, 0, s.z);
     g.rotation.y = s.yaw;
     root.add(g);
-    const sc = TX.canvas(SCREEN.w, SCREEN.h);
-    const st = TX.tex(sc);
+    const { canvas: scReal, view: sc } = TX.scaledCanvas(SCREEN.w, SCREEN.h, texScale);
+    const st = TX.tex(scReal);
     st.anisotropy = 4;
     // unlit: a CRT glows on its own and must not catch highlights from the room lights
     const sm = new THREE.MeshBasicMaterial({ map: st, color: new THREE.Color(1.25, 1.25, 1.25) });
@@ -504,6 +505,10 @@ export function buildOffice(scene, physics, { lang = 'en', reflector = null } = 
     };
     desks.push(desk);
     interactables.push({ kind: 'desk', pos: desk.seat, radius: TUNE.sitRadius, ref: desk });
+    // a desk never moves (its chair is a separate physics prop): freeze its
+    // matrices so the per-frame scene update skips its parts
+    g.updateMatrixWorld(true);
+    g.traverse((o) => { o.matrixAutoUpdate = false; });
   });
 
   // ---- bathroom: stalls, urinals, sinks ----------------------------------------------------
@@ -704,7 +709,9 @@ export function buildOffice(scene, physics, { lang = 'en', reflector = null } = 
   // ---- lights -------------------------------------------------------------------------------------
   const lights = new THREE.Group();
   root.add(lights);
-  lights.add(new THREE.HemisphereLight('#4b52c9', '#2b1a2c', 0.22));
+  const hemi = new THREE.HemisphereLight('#4b52c9', '#2b1a2c', 0.22);
+  lights.add(hemi);
+  const areaLights = [];
   const sun = new THREE.DirectionalLight('#dbe5ff', 1);
   sun.position.set(4, 14, 6);
   sun.target.position.set(0, 0, 0);
@@ -724,6 +731,7 @@ export function buildOffice(scene, physics, { lang = 'en', reflector = null } = 
     ra.position.set(x, 4.1, 0.8);
     ra.lookAt(x, 0, 0.8);
     lights.add(ra);
+    areaLights.push(ra);
   }
   const point = (c, i, d, x, y, z) => { const l = new THREE.PointLight(c, i, d, 2); l.position.set(x, y, z); lights.add(l); return l; };
   const neonL = point('#ff4d5e', 9, 9, 0, 3.2, -8.8);
@@ -760,11 +768,28 @@ export function buildOffice(scene, physics, { lang = 'en', reflector = null } = 
   });
 
   const meshes = B.finalize();
+  // the office itself never moves: freeze its root so only the few parts that
+  // animate (clock hands, rain...) refresh their matrices each frame
+  root.updateMatrixWorld(true);
+  root.matrixAutoUpdate = false;
+
+  // 'lite' lighting (mobile, medium): no area lights over the cubicles and no
+  // per-desk monitor glows; a brighter sky light and sun fill in for them.
+  // The number of lights is compiled into every shader, so fewer lights make
+  // every pixel of every surface cheaper (it costs one recompile when it changes).
+  let lightMode = 'full';
+  function setLights(mode) {
+    lightMode = mode === 'lite' ? 'lite' : 'full';
+    const lite = lightMode === 'lite';
+    for (const l of [...areaLights, ...monitorLights]) l.visible = !lite;
+    hemi.intensity = lite ? 0.62 : 0.22;
+    sun.intensity = lite ? 1.45 : 1;
+  }
 
   // pool of desk-monitor lights follows the screens closest to the camera
   function update(t, dt, camera) {
     for (const u of updaters) u(t, dt);
-    if (camera) {
+    if (camera && lightMode === 'full') {
       const near = desks.map((d) => ({ d, k: d.monitorWorld.distanceToSquared(camera.position) })).sort((a, b) => a.k - b.k);
       monitorLights.forEach((l, i) => {
         const d = near[i] && near[i].d;
@@ -785,7 +810,7 @@ export function buildOffice(scene, physics, { lang = 'en', reflector = null } = 
 
   return {
     root, meshes, colliders, interactables, desks, toilets, urinals, plants, spawnPoints, bossHome, bossWaypoints,
-    quotaBoard: { canvas: boardCanvas, tex: boardTex }, setClock, breakWindows, repairWindows, update, materials: m, weather,
+    quotaBoard: { canvas: boardCanvas, tex: boardTex }, setClock, breakWindows, repairWindows, update, setLights, materials: m, weather,
     bounds: { minX: -14.8, maxX: 14.8, minZ: -9.8, maxZ: 9.8 },
   };
 }

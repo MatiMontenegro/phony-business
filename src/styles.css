@@ -407,9 +407,8 @@ button {
 .board {
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  background: #0c0920db;
+  /* no backdrop blur: over a 3D canvas it is re-blurred every frame (costly on phones) */
+  background: #0c0920eb;
   border-radius: 12px;
   align-items: center;
   gap: 12px;
@@ -1901,6 +1900,144 @@ textarea.notes { width: 100%; height: 100%; box-sizing: border-box; resize: none
 .mhead b { font-size: 18px; line-height: 1.25; }
 .mhead span { font-family: var(--mono); font-size: 12px; color: var(--muted); }
 .mailview p { line-height: 1.55; margin: 0; }
+
+/* ============================================== ScamOS: retro "Luna" skin
+   A Windows-XP-style chrome (blue taskbar, green Start, glossy blue title
+   bars, bliss wallpaper) wrapped around the dark ScamOS apps. Scoped to .pc
+   so it never touches the lobby or the rest of the game UI. */
+.pc {
+  --xp-blue: #245edb; --xp-blue-lo: #1c3fb8; --xp-title: linear-gradient(180deg, #0a51e8 0%, #2b6ffb 8%, #1657e0 42%, #1657e0 90%, #2d7bff 100%);
+  --xp-title-off: linear-gradient(180deg, #7ba6f0 0%, #6a96e6 50%, #5c86d8 100%);
+  --xp-face: #ece9d8; --xp-face-ink: #1d2d4f;
+}
+.pc-wall {
+  background: linear-gradient(180deg, #3f8ef0 0%, #5ba6f4 38%, #74b7e6 52%, #8ec84f 60%, #5a9e2e 78%, #3d7d1f 100%);
+}
+.pc-wall::before {
+  content: ""; left: 0; right: 0; bottom: 0; top: 56%; width: auto; text-align: left; transform: none; color: transparent;
+  background: radial-gradient(130% 80% at 30% 120%, #a7d85a 0%, #6fae34 40%, #3d7d1f 75%), radial-gradient(90% 60% at 85% 130%, #8ec84f 0%, transparent 60%);
+  border-radius: 50% 50% 0 0 / 22% 18% 0 0; box-shadow: 0 -2px 24px #2a5c1555;
+}
+.pc-wall::after {
+  content: "ScamOS"; position: absolute; right: 16px; bottom: 54px; font-family: var(--display); font-size: clamp(34px, 7vw, 86px);
+  color: #ffffff22; letter-spacing: 0.02em; text-shadow: 0 2px 10px #0003;
+}
+/* taskbar */
+.pc-task {
+  height: 44px; padding: 0 0 0 0; border-top: 1px solid #4b86ff;
+  background: linear-gradient(180deg, #3f8cf3 0%, #2b73ec 9%, #245edb 18%, #225ad9 82%, #1c48c7 92%, #1941a5 100%);
+  box-shadow: inset 0 1px 0 #ffffff55;
+}
+.pc-startbtn {
+  font-family: var(--display); font-style: italic; font-size: 21px; color: #fff; text-shadow: 1px 1px 2px #14420f;
+  background: radial-gradient(120% 140% at 30% 20%, #7ec36f 0%, #4fa23f 45%, #2f7a2a 100%);
+  border: 0; border-radius: 0 16px 16px 0 / 0 50% 50% 0; padding: 2px 26px 6px 16px; height: 44px; margin-right: 8px;
+  box-shadow: inset 0 2px 0 #cdecb6aa, inset -2px -3px 6px #1c4e1688, 2px 0 5px #0004;
+}
+.pc-startbtn:hover { filter: brightness(1.08); }
+.pc-taskapps { gap: 3px; padding: 5px 0; }
+.pc-taskapp {
+  border: 1px solid #1a49bf; border-radius: 4px; color: #fff; font-weight: 600; font-size: 13px; padding: 5px 12px;
+  background: linear-gradient(180deg, #5b94f5, #2f68df 52%, #2b61d8); box-shadow: inset 0 1px 0 #ffffff66;
+}
+.pc-taskapp.on { background: linear-gradient(180deg, #1c42a8, #2458cf 60%, #3f7bf0); box-shadow: inset 0 2px 4px #0c2a7a; }
+.pc-taskapp .badge { background: var(--hotline); box-shadow: 0 1px 3px #0006; }
+.pc-tray {
+  background: linear-gradient(180deg, #1c8ad6, #137fc8 50%, #0f72bb); border-left: 1px solid #0d5a98;
+  box-shadow: inset 1px 0 0 #4fb0ea; color: #eaf6ff; height: 44px; margin-left: 6px; padding: 0 12px;
+}
+.pc-tray .tray-clock { color: #fff; }
+.pc-back {
+  border: 1px solid #1a49bf; border-radius: 4px; color: #fff; margin: 5px 6px 5px 0;
+  background: linear-gradient(180deg, #5b94f5, #2f68df 52%, #2b61d8); box-shadow: inset 0 1px 0 #ffffff66;
+}
+/* windows */
+.pc .win {
+  border: 3px solid; border-color: #2a6ff0 #1a4fc6 #1a4fc6; border-top: 0; border-radius: 8px 8px 6px 6px;
+  background: #120e2e; box-shadow: 0 14px 40px #0007;
+}
+.pc .win.focused { border-color: #2a6ff0 #1a4fc6 #1a4fc6; box-shadow: 0 18px 50px #0009; }
+.pc .wbar {
+  background: var(--xp-title); color: #fff; border: 0; border-radius: 6px 6px 0 0; padding: 4px 6px 5px 8px; height: 29px; box-sizing: border-box;
+  box-shadow: inset 0 1px 0 #ffffff66;
+}
+.pc .win:not(.focused) .wbar { background: var(--xp-title-off); }
+.pc .wbar .ico { color: #fff; width: 17px; height: 17px; filter: drop-shadow(0 1px 1px #0005); }
+.pc .wbar .wt { font-weight: 700; font-size: 13.5px; text-shadow: 1px 1px 2px #0a3b8f; }
+.pc .wbar .wx { color: #dfeaff; }
+.pc .wbtn {
+  width: 22px; height: 21px; border-radius: 4px; border: 1px solid #ffffffaa; color: #fff;
+  background: linear-gradient(180deg, #f08a7a, #e24b3a 55%, #c22e1e); box-shadow: inset 0 1px 0 #ffffff88;
+}
+.pc .wbtn:hover { filter: brightness(1.12); background: linear-gradient(180deg, #ff9b8a, #ef5a46 55%, #d23020); }
+/* start menu */
+.pc-start {
+  width: 300px; padding: 0; border: 2px solid #1b4fc8; border-top: 0; border-radius: 0 0 10px 10px; overflow: hidden;
+  background: #fff; box-shadow: 0 18px 50px #0009; bottom: 44px; left: 0;
+}
+.pc-start .who {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin: 0; border-bottom: 2px solid #ec9a2e;
+  background: linear-gradient(180deg, #2e6bdf, #1f4fc0); color: #fff;
+}
+.pc-start .who i { width: 32px; height: 32px; border-radius: 6px; border: 2px solid #ffffffcc; }
+.pc-start .who b { font-size: 15px; text-shadow: 1px 1px 2px #0a2f7f; }
+.pc-start .who span { color: #d7e6ff; }
+.pc-start button {
+  color: #11204a; border-radius: 0; padding: 7px 14px; font-weight: 600; display: flex; align-items: center; gap: 9px; width: 100%;
+}
+.pc-start button .ico { width: 20px; height: 20px; color: var(--xp-blue); }
+.pc-start button:hover { background: var(--xp-blue); color: #fff; }
+.pc-start button:hover .ico { color: #fff; }
+.pc-start .startcat { padding: 5px 14px 2px; font-size: 11px; font-weight: 700; color: #6a7390; text-transform: uppercase; letter-spacing: 0.04em; }
+.pc-start hr { border: 0; border-top: 1px solid #c3cbe0; margin: 4px 0; }
+.pc-start .logoff { color: #b01818; border-top: 1px solid #c3cbe0; }
+.pc-start .logoff .ico { color: #b01818; }
+.pc-start .logoff:hover { background: #b01818; color: #fff; }
+.pc-start .logoff:hover .ico { color: #fff; }
+/* desktop icons: white label text on the bliss wallpaper */
+.pc .dicon { color: #fff; }
+.pc .dicon span { text-shadow: 0 1px 3px #000a, 0 0 2px #0007; font-weight: 600; }
+.pc .dicon .ico { color: #fff; filter: drop-shadow(0 2px 3px #0008); }
+.pc .dicon:hover, .pc .dicon:focus-visible { background: #3b6ad73a; outline: 1px dotted #ffffff88; }
+
+/* ---- Minesweeper ---- */
+.mines { display: grid; gap: 8px; padding: 10px; background: #bdbab0; height: 100%; box-sizing: border-box; align-content: start; }
+.mstatus { display: flex; align-items: center; gap: 10px; border: 2px inset #fff; background: #c6c3b9; padding: 6px 8px; }
+.mcount { font-family: var(--mono); font-weight: 700; background: #1a0000; color: #ff2d2d; padding: 2px 8px; border-radius: 3px; min-width: 42px; text-align: center; }
+.mface { font-family: var(--mono); font-weight: 800; font-size: 15px; width: 30px; height: 28px; border: 2px outset #fff; background: #d6d3c8; color: #1d2d4f; cursor: pointer; }
+.mface:active { border-style: inset; }
+.mflag { font-family: var(--mono); font-weight: 800; font-size: 14px; width: 30px; height: 28px; border: 2px outset #fff; background: #d6d3c8; color: #c22e1e; cursor: pointer; }
+.mflag.on { border-style: inset; background: #ffe08a; }
+.mmsg { font-size: 11.5px; color: #3a3a3a; margin-left: auto; }
+.mgrid { display: grid; gap: 1px; background: #8a877e; border: 3px inset #fff; padding: 3px; }
+.mcell {
+  aspect-ratio: 1; min-width: 20px; border: 2px outset #f2efe6; background: #cbc8bd; font-family: var(--mono); font-weight: 800;
+  font-size: 15px; color: #1d2d4f; display: grid; place-items: center; padding: 0; cursor: pointer; line-height: 1;
+}
+.mcell.open { border: 1px solid #9a978d; background: #d7d4c9; cursor: default; }
+.mcell.flag { color: #c22e1e; }
+.mcell.mine.open { background: #e05c4c; color: #1a0000; }
+.mcell.n1 { color: #1a39d8; } .mcell.n2 { color: #1a8a1a; } .mcell.n3 { color: #d81a1a; } .mcell.n4 { color: #1a1a7a; }
+.mcell.n5 { color: #7a1a1a; } .mcell.n6 { color: #1a7a7a; } .mcell.n7 { color: #1d2d4f; } .mcell.n8 { color: #6a6a6a; }
+
+/* ---- Snake ---- */
+.snake { display: grid; gap: 8px; padding: 12px; place-items: center; align-content: center; background: #1a2030; height: 100%; box-sizing: border-box; }
+.sscore { display: flex; gap: 14px; font-family: var(--mono); font-weight: 700; color: #9fffb0; font-size: 14px; }
+.sscore .sbest { color: #8fa7ff; }
+.scanvas { width: min(300px, 78vmin); height: auto; aspect-ratio: 1; image-rendering: pixelated; border: 3px solid #0b2a12; border-radius: 4px; box-shadow: 0 6px 20px #0007; }
+.shint { font-size: 12px; color: #b9c6e0; min-height: 1em; text-align: center; }
+
+/* ---- Phony Feed ---- */
+.feed { height: 100%; overflow-y: auto; scroll-snap-type: y mandatory; scrollbar-width: none; background: #000; }
+.feed::-webkit-scrollbar { display: none; }
+.feedcard { height: 100%; scroll-snap-align: start; position: relative; display: grid; align-content: space-between; color: #fff; padding: 14px; box-sizing: border-box; }
+.feedtop { font-family: var(--display); font-size: 15px; text-shadow: 0 1px 4px #0008; opacity: 0.9; }
+.feedplay { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.feedplay .ico { width: 64px; height: 64px; color: #ffffffcc; filter: drop-shadow(0 4px 10px #0008); animation: 2.4s ease-in-out infinite bob; }
+.feedmeta { position: relative; z-index: 1; display: grid; gap: 4px; text-shadow: 0 1px 4px #0009; }
+.feedmeta b { font-size: 15px; }
+.feedmeta p { margin: 0; font-size: 14px; line-height: 1.35; }
+.feedstats { display: flex; gap: 14px; font-weight: 700; font-size: 13px; opacity: 0.92; margin-top: 2px; }
 
 /* ============================================================ settings */
 .settings .swin { width: min(760px, 100%); display: grid; grid-template-rows: auto auto minmax(0, 1fr); max-height: calc(100vh - 32px); }

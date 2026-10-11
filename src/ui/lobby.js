@@ -6,6 +6,7 @@ import { t } from '../i18n.js';
 import { settings, keyLabel } from '../settings.js';
 import { SKIN_TONES, HAIR_COLORS, EYE_COLORS, SHIRT_COLORS, PANTS_COLORS, SHIRT_STYLES, HAT_STYLES, BUILD_STYLES, randomLook, normalizeLook } from '../actors/rig.js';
 import { FACES, HAIR_STYLES } from '../actors/avatar.js';
+import { TUNE } from '../config.js';
 
 const NAMES = ['Gary', 'Dolores', 'Tiffany', 'Chad', 'Brenda', 'Kevin', 'Marge', 'Dwayne', 'Pam', 'Rocco', 'Nuria', 'Facundo', 'Lucía', 'Tito', 'Mirta'];
 const HAT_NAMES = {
@@ -129,10 +130,19 @@ export class Lobby {
       tabs, sec,
       $('div', { class: 'row2' }, this.field(t('language', L), lang), this.field(t('shiftCode', L), code, 'pb-code')),
       $('div', { class: 'help', text: t('shiftCodeHelp', L), style: { margin: '-8px 0 12px' } }),
+      this.field(t('shiftLen', L), this.shiftChips()),
+      $('div', { class: 'help', text: t('shiftLenHelp', L), style: { margin: '-8px 0 12px' } }),
       this.field(t('graphics', L), qual),
       $('div', { class: 'ai-note' }, $('div', { text: aiNote }), $('div', { class: 'mic' }, icon(plat.mic ? 'mic' : 'micOff'), ' ', micNote)),
       this.punchBtn, this.stamp);
     this.el.append(left, form);
+  }
+
+  // minutes per shift, used when you are the one opening the office
+  shiftChips() {
+    const cur = TUNE.shiftChoices.includes(+settings.get('game.shiftMin')) ? +settings.get('game.shiftMin') : TUNE.shiftSeconds / 60;
+    return $('div', { class: 'chips', role: 'group' }, ...TUNE.shiftChoices.map((m) =>
+      $('button', { class: 'chip', type: 'button', 'aria-pressed': String(cur === m), text: m + ' min', onclick: () => { settings.set('game.shiftMin', m); this.game.audio.uiClick(); this.render(); } })));
   }
 
   aiLine(L) {

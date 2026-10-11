@@ -3,3 +3,5 @@ dist/
 dist-artifact/
 tests/out/
 *.log
+# personal voice-model recordings (Voicebox profiles): never committed
+src/voice/models/

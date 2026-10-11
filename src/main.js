@@ -35,9 +35,11 @@ function bootScreen(lang) {
 function pickQuality() {
   const q = params.get('q') || settings.get('quality');
   if (q) return { q, auto: false };
+  // phones and tablets start on the light mobile path (no post-processing, lite
+  // lights); the auto-tuner only ever steps down from here
   const coarse = matchMedia('(pointer: coarse)').matches;
   const cores = navigator.hardwareConcurrency || 4;
-  return { q: coarse ? 'medium' : cores >= 8 ? 'high' : 'medium', auto: true };
+  return { q: coarse ? 'low' : cores >= 8 ? 'high' : 'medium', auto: true };
 }
 
 async function main() {

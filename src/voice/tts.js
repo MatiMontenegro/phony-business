@@ -45,6 +45,8 @@ export class Voice {
     this.casting = new Map(); // character id -> voice
     this.speaking = false;
     this.listeners = new Set();
+    this.own = null;          // Voicebox client for the developer's own voice model
+    this.clipPlaying = false; // an own-voice clip is playing (not the browser synth)
     if (this.synth) {
       const load = () => { this.voices = this.synth.getVoices() || []; this.casting.clear(); };
       load();
@@ -94,6 +96,10 @@ export class Voice {
   speak(text, { id = 'narrator', lang = 'en', gender = 'any', pitch = 1, rate = 1, style = null, volume = 1, priority = 2, onstart, onend, onboundary } = {}) {
     if (!this.enabled || !text) { if (onend) setTimeout(onend, 300); return null; }
     const s = this.synth;
+    if (this.clipPlaying) {
+      if (priority < this.busyPriority) { if (onend) setTimeout(onend, 0); return null; }
+      this.own.stop();
+    }
     if (s.speaking || s.pending) {
       if (priority < this.busyPriority) { if (onend) setTimeout(onend, 0); return null; }
       if (priority > this.busyPriority) s.cancel();
@@ -107,12 +113,24 @@ export class Voice {
     u.rate = sh.rate;
     u.volume = Math.max(0, Math.min(1, volume * (settings.get('audio.voices') ?? 1) * (settings.get('audio.master') ?? 1)));
     this.busyPriority = priority;
+    // browsers sometimes never fire onend (long lines, a tab in the background):
+    // a watchdog finishes the line anyway so the open mic never waits forever
+    let finished = false, guard = setTimeout(() => done(), 30000);
     const done = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(guard);
       this.alive = this.alive.filter((x) => x !== u);
-      if (!s.speaking) { this.busyPriority = -1; this.setSpeaking(false); }
+      if (!s.speaking && !this.clipPlaying) { this.busyPriority = -1; this.setSpeaking(false); }
       if (onend) onend();
     };
-    u.onstart = () => { this.setSpeaking(true); if (onstart) onstart(); };
+    u.onstart = () => {
+      if (finished) return;
+      clearTimeout(guard);
+      guard = setTimeout(() => done(), 3000 + u.text.length * 120 / (u.rate || 1));
+      this.setSpeaking(true);
+      if (onstart) onstart();
+    };
     u.onend = done;
     u.onerror = done;
     if (onboundary) u.onboundary = onboundary;
@@ -122,6 +140,43 @@ export class Voice {
   }
 
   preview(id, lang, gender, p) {
-    this.speak(lang === 'es' ? '¡Hola! Así sueno en la llamada.' : 'Hi! This is how I sound on the call.', { id, lang, gender, ...p, priority: 3 });
+    this.speakAs(id, lang === 'es' ? '¡Hola! Así sueno en la llamada.' : 'Hi! This is how I sound on the call.', { lang, gender, ...p, priority: 3 });
+  }
+
+  // stop whatever is being said (hang-up, push-to-talk, mute)
+  cancel() {
+    if (this.synth) this.synth.cancel();
+    if (this.own) this.own.stop();
+    this.clipPlaying = false;
+    this.busyPriority = -1;
+    this.setSpeaking(false);
+  }
+
+  // ---- the developer's own voice model (Voicebox), for its character only ----------------------
+  useOwn(own) { this.own = own; }
+
+  // like speak(), but a character with an own voice model uses it; if the model
+  // cannot speak right now the browser voice takes over
+  speakAs(id, text, opts = {}) {
+    const own = this.own;
+    if (!own || !own.readyFor(id) || !text) return this.speak(text, { id, ...opts });
+    const { lang = 'en', volume = 1, priority = 2, onstart, onend } = opts;
+    if (this.clipPlaying && priority < this.busyPriority) { if (onend) setTimeout(onend, 0); return null; }
+    this.busyPriority = priority;
+    own.speak(text, {
+      lang,
+      volume: volume * (settings.get('audio.voices') ?? 1),
+      onstart: () => {
+        if (this.synth && (this.synth.speaking || this.synth.pending)) this.synth.cancel();
+        this.clipPlaying = true;
+        this.setSpeaking(true);
+        if (onstart) onstart();
+      },
+      onend: () => { this.clipPlaying = false; this.busyPriority = -1; this.setSpeaking(false); if (onend) onend(); },
+    }).then((r) => {
+      if (r === 'failed') { this.busyPriority = -1; this.speak(text, { id, ...opts }); }
+      else if (r === 'stale' && onend) onend();
+    });
+    return null;
   }
 }

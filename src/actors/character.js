@@ -16,6 +16,31 @@ const _s = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
 export const CAPSULE = { hh: 0.64, r: 0.24 };
 
+// every live character, for the once-per-frame visibility pass below
+export const CHARACTERS = new Set();
+const _frustum = new THREE.Frustum();
+const _pm = new THREE.Matrix4();
+const _sphere = new THREE.Sphere();
+
+// Characters are the most expensive thing in a frame (dozens of parts each, all
+// marked frustumCulled=false because skinned bounds are unreliable), so they are
+// culled here as a whole: off-screen ones are not drawn at all, and the ones
+// farther than `lodDist` drop their small face and clothing parts. Run after
+// the camera has moved and before rendering.
+export function cullCharacters(camera, lodDist) {
+  _pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+  _frustum.setFromProjectionMatrix(_pm);
+  for (const c of CHARACTERS) {
+    const rig = c.rig;
+    if (!rig.ready) continue;
+    c.centerWorld(_sphere.center);
+    _sphere.radius = 1.5 * c.scale; // generous: limbs, a hat, a shadow just off-screen
+    const inView = !!c.ragdoll || _frustum.intersectsSphere(_sphere);
+    rig.root.visible = c.wantVisible && inView;
+    if (rig.root.visible) rig.setDetail(_sphere.center.distanceTo(camera.position) < lodDist);
+  }
+}
+
 export class Character {
   constructor(scene, physics, look = {}, opts = {}) {
     this.scene = scene;
@@ -40,6 +65,8 @@ export class Character {
     this.talking = 0;
     this.greedBase = 0;
     this.speechLevel = -1; // >= 0 when driven by real audio levels
+    this.wantVisible = true; // what setVisible asked for; culling only ever hides more
+    CHARACTERS.add(this);
     this.id = opts.id || Math.random().toString(36).slice(2, 8);
     if (opts.capsule !== false) {
       const hh = CAPSULE.hh * this.scale, r = CAPSULE.r * this.scale;
@@ -197,9 +224,10 @@ export class Character {
     return out.set(this.position.x, this.position.y + 1.0 * this.scale, this.position.z);
   }
 
-  setVisible(v) { this.rig.root.visible = v && this.rig.ready; }
+  setVisible(v) { this.wantVisible = v; this.rig.root.visible = v && this.rig.ready; }
 
   dispose() {
+    CHARACTERS.delete(this);
     if (this.ragdoll) this.ragdoll.dispose();
     if (this.body) this.physics.world.removeRigidBody(this.body);
     this.rig.dispose();

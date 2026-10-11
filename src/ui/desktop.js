@@ -8,6 +8,13 @@ import { keyLabel, settings } from '../settings.js';
 import { setPortrait } from './portrait.js';
 import { usage } from '../ai/usage.js';
 import { TUNE } from '../config.js';
+import { Minesweeper, Snake, PhonyFeed } from './apps.js';
+
+// the moods the offline brain reports (AI providers may say others; those show as they come)
+const MOOD_ES = {
+  wary: 'con dudas', warming: 'entrando en confianza', trusting: 'confía', suspicious: 'sospecha', hesitant: 'duda',
+  worried: 'preocupación', annoyed: 'fastidio', offended: 'ofensa', delighted: 'encanto', generous: 'generosidad', sweet: 'dulzura', eager: 'entusiasmo',
+};
 
 // ---- projective mapping of the desktop onto the monitor ----------------------------------
 function adj(m) {
@@ -42,14 +49,14 @@ export const PC_W = 1024, PC_H = 768;
 const MAIL = {
   en: [
     ['Big Phil', 'READ THIS. Phones ring at ANY desk', 'Phones ring all over the floor. Run to the one that rings, sit, and your login follows you: whatever desk you sit at is YOUR line. There are fewer lines than people, so FIGHT for them. (I will not throw things over a missed call. Everything else, maybe.)'],
-    ['Accounting', 'Get the transfer code or it did not happen', 'On a "fee" call the customer READS OUT a confirmation code (like TRF-4821). Write it down and type it into Lead Registry within 90 seconds or the money evaporates. Grandma Nelly is a scambaiter: her codes are fake. Do not type those.'],
+    ['Accounting', 'Get the transfer code or it did not happen', 'On a "fee" call the customer READS OUT a confirmation code (like TRF-4821). Write it down and type it into Lead Registry within 90 seconds or the money evaporates. WARNING: any customer can secretly be a scambaiter. If it all goes too easy, they ask you to repeat everything or they want YOUR name and branch, hang up: their codes are fake.'],
     ['Data Broker', 'Buying customer records', 'When a customer reads you a (fake) code, password, Social Security or card number, register it in Lead Registry and sell it to me. Google codes, bank passwords, SSNs and cards each pay differently. If you remote into their PC it is usually in passwords.txt. I check, so type it right.'],
     ['Awareness Office', 'This is parody — the point is the opposite', 'None of these numbers are real (we generate fake ones). After every call you get a RED FLAGS card listing the tricks that were used. In real life: a real bank, courier or office never calls to ask for your codes, passwords or card. Hang up and call the official number.'],
     ['IT', 'Remote Assist', 'Remote Assist connects to the customer\'s computer while you are on a call. Hit the green zone three times. Miss twice and they notice and get angry.'],
   ],
   es: [
     ['Big Phil', 'LEAN ESTO. Los teléfonos suenan en CUALQUIER escritorio', 'Los teléfonos suenan por todo el piso. Corran al que suena, siéntense y su sesión los sigue: el escritorio donde se sienten es SU línea. Hay menos líneas que gente, así que PELÉENSE por atender. (No voy a tirar cosas por una llamada perdida. Por lo demás, quizás.)'],
-    ['Contaduría', 'Sin código de transferencia no pasó', 'En una llamada de "tarifa" el cliente te DICTA un código de confirmación (tipo TRF-4821). Anotalo y cargalo en el Registro de clientes en menos de 90 segundos o la plata se evapora. La Abuela Nelly es cazaestafadores: sus códigos son truchos. No los cargues.'],
+    ['Contaduría', 'Sin código de transferencia no pasó', 'En una llamada de "tarifa" el cliente te DICTA un código de confirmación (tipo TRF-4821). Anotalo y cargalo en el Registro de clientes en menos de 90 segundos o la plata se evapora. OJO: cualquier cliente puede ser un cazaestafadores encubierto. Si todo sale demasiado fácil, te hace repetir todo o te pide TU nombre y sucursal, cortá: sus códigos son truchos.'],
     ['Comprador de datos', 'Compro fichas de clientes', 'Cuando un cliente te dicta un código, clave, Seguro Social o tarjeta (todos falsos), registralo en el Registro de clientes y vendémelo. Los códigos de Google, las claves de banco, los Seguros Sociales y las tarjetas pagan distinto. Si entrás a su PC suele estar en claves.txt. Lo chequeo, así que escribilo bien.'],
     ['Oficina de Concientización', 'Esto es parodia: el punto es al revés', 'Ningún número de acá es real (generamos falsos). Después de cada llamada te damos una ficha de BANDERAS ROJAS con los trucos que se usaron. En la vida real: ningún banco, correo ni oficina de verdad te llama para pedirte códigos, claves ni la tarjeta. Cortá y llamá vos al número oficial.'],
     ['Sistemas', 'Asistencia remota', 'La Asistencia remota se conecta a la compu del cliente mientras estás en llamada. Pegale a la zona verde tres veces. Si fallás dos, se da cuenta y se enoja.'],
@@ -57,8 +64,8 @@ const MAIL = {
 };
 
 const PHOTOS = {
-  en: { elvira: 'Michi the cat asleep on the keyboard.', kevo: 'A blurry gaming setup with too many LEDs.', tito: 'His taxi "La Gorda" double-parked.', mariela: 'Three kids, one is upside down.', hernan: 'His sailboat "Molar", barely afloat.', lu: 'A latte, going cold, perfectly lit.', ramon: 'Teresa the cow opening a gate.', gerardo: 'A pigeon, circled in red marker.', sofia: 'A tower of law textbooks.', walter: 'A spreadsheet, zoomed into cell B7.', pato: 'Seven rubber stamps in a row.', johnny: 'Twelve eggs and a protein tub.', matias: 'A ragdoll stuck inside the floor.', nelly: 'Nelly with a headset and three monitors. Suspicious.' },
-  es: { elvira: 'Michi el gato dormido sobre el teclado.', kevo: 'Un setup gamer borroso con demasiados LED.', tito: 'Su taxi "La Gorda" mal estacionado.', mariela: 'Tres chicos, uno está patas arriba.', hernan: 'Su velero "Muela", apenas a flote.', lu: 'Un café con leche enfriándose, bien iluminado.', ramon: 'La vaca Teresa abriendo una tranquera.', gerardo: 'Una paloma, marcada con fibrón rojo.', sofia: 'Una torre de libros de derecho.', walter: 'Una planilla, con zoom en la celda B7.', pato: 'Siete sellos en fila.', johnny: 'Doce huevos y un pote de proteína.', matias: 'Un ragdoll trabado dentro del piso.', nelly: 'Nelly con auriculares y tres monitores. Sospechoso.' },
+  en: { elvira: 'Michi the cat asleep on the keyboard.', kevo: 'A blurry gaming setup with too many LEDs.', tito: 'His taxi "La Gorda" double-parked.', mariela: 'Three kids, one is upside down.', hernan: 'His sailboat "Molar", barely afloat.', lu: 'A latte, going cold, perfectly lit.', ramon: 'Teresa the cow opening a gate.', gerardo: 'A pigeon, circled in red marker.', sofia: 'A tower of law textbooks.', walter: 'A spreadsheet, zoomed into cell B7.', pato: 'Seven rubber stamps in a row.', johnny: 'Twelve eggs and a protein tub.', matias: 'A ragdoll stuck inside the floor.', nelly: 'Eleven cats on a couch, one wearing a scarf.' },
+  es: { elvira: 'Michi el gato dormido sobre el teclado.', kevo: 'Un setup gamer borroso con demasiados LED.', tito: 'Su taxi "La Gorda" mal estacionado.', mariela: 'Tres chicos, uno está patas arriba.', hernan: 'Su velero "Muela", apenas a flote.', lu: 'Un café con leche enfriándose, bien iluminado.', ramon: 'La vaca Teresa abriendo una tranquera.', gerardo: 'Una paloma, marcada con fibrón rojo.', sofia: 'Una torre de libros de derecho.', walter: 'Una planilla, con zoom en la celda B7.', pato: 'Siete sellos en fila.', johnny: 'Doce huevos y un pote de proteína.', matias: 'Un ragdoll trabado dentro del piso.', nelly: 'Once gatos en un sillón, uno con bufanda.' },
 };
 const WALL = {
   elvira: 'linear-gradient(160deg,#c78bff,#3a2a5a)', kevo: 'linear-gradient(160deg,#46e3a0,#1a1a22)', tito: 'linear-gradient(160deg,#ffd84d,#2b2550)', mariela: 'linear-gradient(160deg,#ff9f6b,#1f2a44)',
@@ -67,6 +74,11 @@ const WALL = {
   matias: 'linear-gradient(160deg,#2c3a5a,#1a1a22)', nelly: 'linear-gradient(160deg,#c78bff,#3a2a5a)',
 };
 const WALLDEF = 'linear-gradient(160deg,#4a5378,#1a2030)';
+// what a secret scambaiter keeps on their computer
+const BAITER_PC = {
+  en: { diary: `Channel notes: scam calls this week: 14. Record: 3 hours 12 minutes on the line. Remember: act gullible, stall, record EVERYTHING.`, pw: `(all made up for the scammers, lol)`, photo: `A streaming mic pointed at the phone, and a sign: ON AIR.`, trash: `script_for_scammers_v3.txt\nrecordings/\nfake_card_numbers.txt` },
+  es: { diary: `Notas del canal: llamadas de estafadores esta semana: 14. Récord: 3 horas y 12 minutos en línea. Acordate: hacete el ingenuo, hacelos esperar y grabá TODO.`, pw: `(todo inventado para los chantas, jaja)`, photo: `Un micrófono de streaming apuntando al teléfono, y un cartel: AL AIRE.`, trash: `guion_para_estafadores_v3.txt\ngrabaciones/\ntarjetas_truchas.txt` },
+};
 
 const kb = (a) => keyLabel((settings.data.controls.bindings[a] || [])[0]);
 
@@ -155,7 +167,7 @@ export class Desktop {
     this.task = $('div', { class: 'pc-task' });
     this.startMenu = $('div', { class: 'pc-start', hidden: true });
     this.screen.append(this.wall, this.icons, this.winLayer, this.task, this.startMenu);
-    const apps = [['phone', 'phone'], ['leads', 'ledger'], ['remote', 'remote'], ['notes', 'notes'], ['mail', 'mail'], ['settings', 'gear']];
+    const apps = [['phone', 'phone'], ['leads', 'ledger'], ['remote', 'remote'], ['notes', 'notes'], ['mail', 'mail'], ['mines', 'mine'], ['snake', 'snake'], ['feed', 'feed'], ['settings', 'gear']];
     this.appIcons = {};
     for (const [id, ic] of apps) {
       const b = $('button', { class: 'dicon', onclick: () => this.openApp(id) }, icon(ic), $('span', { text: this.appName(id) }));
@@ -167,19 +179,23 @@ export class Desktop {
     this.wins.remote = new Win(this, 'remote', 'remote', { x: 20, y: 8, w: 56, h: 72 });
     this.wins.notes = new Win(this, 'notes', 'notes', { x: 60, y: 46, w: 30, h: 42 });
     this.wins.mail = new Win(this, 'mail', 'mail', { x: 21, y: 9, w: 58, h: 72 });
+    this.wins.mines = new Win(this, 'mines', 'mine', { x: 30, y: 6, w: 40, h: 78 });
+    this.wins.snake = new Win(this, 'snake', 'snake', { x: 34, y: 8, w: 34, h: 74 });
+    this.wins.feed = new Win(this, 'feed', 'feed', { x: 62, y: 5, w: 26, h: 86 });
     for (const w of Object.values(this.wins)) this.winLayer.append(w.el);
     this.buildPhone();
     this.buildLeads();
     this.buildRemote();
     this.buildNotes();
     this.buildMail();
+    this.buildArcade();
     this.buildTaskbar();
     this.relabel();
     void L;
   }
 
   appName(id) {
-    return t({ phone: 'appPhone', leads: 'appLeads', remote: 'appRemote', notes: 'appNotes', mail: 'appMail', settings: 'appSettings' }[id], this.L);
+    return t({ phone: 'appPhone', leads: 'appLeads', remote: 'appRemote', notes: 'appNotes', mail: 'appMail', mines: 'appMines', snake: 'appSnake', feed: 'appFeed', settings: 'appSettings' }[id], this.L);
   }
 
   relabel() {
@@ -205,6 +221,8 @@ export class Desktop {
     if (id === 'phone' && this.input && !this.input.disabled) setTimeout(() => this.input.focus({ preventScroll: true }), 30);
     if (id === 'leads') setTimeout(() => (this.voucherIn && this.voucherIn.focus({ preventScroll: true })), 30);
     if (id === 'remote') this.renderRemote();
+    if (id === 'snake') { if (document.activeElement && this.el.contains(document.activeElement)) document.activeElement.blur(); this.snake.renderStatus(); this.snake.draw(); }
+    if (id === 'feed') this.feed.lastPos = -1;
     this.game.audio.uiClick();
   }
 
@@ -271,6 +289,13 @@ export class Desktop {
       e.stopPropagation();
       this.hackHit();
     }
+    // arrows / WASD drive Snake when its window is the one on top; it owns the
+    // keyboard then, so drop focus from a stray input (e.g. the phone composer)
+    if (this.snake && this.focused === this.wins.snake && this.wins.snake.open && (e.code.startsWith('Arrow') || ['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code))) {
+      const ae = document.activeElement;
+      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA') && !this.wins.snake.el.contains(ae)) ae.blur();
+      this.snake.onKey(e);
+    }
   }
 
   // ---- taskbar ---------------------------------------------------------------------------
@@ -303,7 +328,12 @@ export class Desktop {
     dot.style.background = g.profile.look.shirt.color;
     this.startMenu.append($('div', { class: 'who' }, dot, $('b', { text: g.profile.name }), $('span', { text: g.me && g.me.desk ? (L === 'es' ? 'Línea ' : 'Line ') + (g.me.desk.index + 1) : '' })));
     for (const id of ['phone', 'leads', 'remote', 'notes', 'mail', 'settings']) {
-      this.startMenu.append($('button', { onclick: () => { this.startMenu.hidden = true; this.openApp(id); } }, this.appName(id)));
+      this.startMenu.append($('button', { onclick: () => { this.startMenu.hidden = true; this.openApp(id); } }, icon(this.winIcon(id)), ' ', this.appName(id)));
+    }
+    this.startMenu.append($('hr'));
+    this.startMenu.append($('div', { class: 'startcat', text: t('arcadeGames', L) }));
+    for (const id of ['mines', 'snake', 'feed']) {
+      this.startMenu.append($('button', { onclick: () => { this.startMenu.hidden = true; this.openApp(id); } }, icon(this.winIcon(id)), ' ', this.appName(id)));
     }
     this.startMenu.append($('hr'));
     this.startMenu.append($('button', { onclick: () => { this.startMenu.hidden = true; this.game.closePC(); } }, t('pcBack', L)));
@@ -420,7 +450,7 @@ export class Desktop {
     this.patBar.style.width = Math.round(c.patience) + '%';
     this.trustVal.textContent = Math.round(c.trust);
     this.patVal.textContent = Math.round(c.patience);
-    this.moodEl.textContent = (L === 'es' ? 'humor: ' : 'mood: ') + (c.mood || '');
+    this.moodEl.textContent = (L === 'es' ? 'humor: ' + (MOOD_ES[c.mood] || c.mood || '') : 'mood: ' + (c.mood || ''));
     this.timerEl.textContent = clock(c.elapsed);
     const partial = g.partial || '';
     const key = `${c.transcript.length}|${this.calls.busy}|${this.calls.state}|${partial}|${this.calls.pending}`;
@@ -647,13 +677,15 @@ export class Desktop {
     if (!c) { this.renderRemote(); return; }
     clear(this.remoteBody);
     const files = [['diary', 'file', L === 'es' ? 'diario.txt' : 'diary.txt'], ['pw', 'file', L === 'es' ? 'claves.txt' : 'passwords.txt'], ['photo', 'photo', 'IMG_0042.jpg'], ['trash', 'trash', t('recycle', L)]];
-    const desk = $('div', { class: 'desktop', style: { background: WALL[c.mark.id] || WALLDEF } });
+    const desk = $('div', { class: 'desktop', style: { background: WALL[c.mark.id] || c.mark.wall || WALLDEF } });
     for (const [id, ic, name] of files) desk.append($('button', { class: 'dicon', onclick: () => this.renderVictim(c, id) }, icon(ic), $('span', { text: name })));
     let text = null;
-    if (open === 'diary') text = c.mark.diary[L];
-    if (open === 'pw') text = c.leads.map((l) => `${l.label[L]}:\n${l.value}`).join('\n\n') + `\n\n${L === 'es' ? '(no se lo digas a nadie)' : '(do not tell anyone)'}`;
-    if (open === 'photo') text = (PHOTOS[L] || PHOTOS.en)[c.mark.id] || '';
-    if (open === 'trash') text = L === 'es' ? 'plan_para_hacerme_rico_v7.doc\nfoto_fea_mia.jpg\nreceta_secreta_de_milanesa.txt' : 'get_rich_plan_v7.doc\nugly_photo_of_me.jpg\nsecret_meatloaf_recipe.txt';
+    // a secret scambaiter's computer gives them away, for whoever looks
+    const bt = c.baiter ? BAITER_PC[L] || BAITER_PC.en : null;
+    if (open === 'diary') text = bt ? bt.diary : c.mark.diary[L];
+    if (open === 'pw') text = c.leads.map((l) => `${l.label[L]}:\n${l.value}`).join('\n\n') + `\n\n${bt ? bt.pw : L === 'es' ? '(no se lo digas a nadie)' : '(do not tell anyone)'}`;
+    if (open === 'photo') text = bt ? bt.photo : (PHOTOS[L] || PHOTOS.en)[c.mark.id] || (c.mark.photo && c.mark.photo[L]) || '';
+    if (open === 'trash') text = bt ? bt.trash : L === 'es' ? 'plan_para_hacerme_rico_v7.doc\nfoto_fea_mia.jpg\nreceta_secreta_de_milanesa.txt' : 'get_rich_plan_v7.doc\nugly_photo_of_me.jpg\nsecret_meatloaf_recipe.txt';
     this.remoteBody.append($('div', { class: 'victim' }, $('div', { class: 'vbar' }, $('b', { text: c.mark.os }), $('span', { text: t('files', L) })), desk, text ? $('div', { class: 'filewin', text }) : null));
   }
 
@@ -686,6 +718,22 @@ export class Desktop {
     this.notes.placeholder = t('notesPh', L);
   }
 
+  // ---- arcade apps (Minesweeper, Snake, Phony Feed) --------------------------------------------
+  buildArcade() {
+    // progress from the little games feeds the bonus goals via the game
+    const ev = (kind) => (name, n) => this.game.onArcade(kind, name, n);
+    this.mines = new Minesweeper(this.game, ev('mines'));
+    this.snake = new Snake(this.game, ev('snake'));
+    this.feed = new PhonyFeed(this.game, ev('feed'));
+    this.wins.mines.body.append(this.mines.el);
+    this.wins.snake.body.append(this.snake.el);
+    this.wins.feed.body.append(this.feed.el);
+  }
+
+  winIcon(id) {
+    return { phone: 'phone', leads: 'ledger', remote: 'remote', notes: 'notes', mail: 'mail', mines: 'mine', snake: 'snake', feed: 'feed', settings: 'gear' }[id] || 'file';
+  }
+
   // ---- per frame ------------------------------------------------------------------------------
   update(dt) {
     if (this.phase === 'closed') return;
@@ -699,6 +747,7 @@ export class Desktop {
       this.leadsT = (this.leadsT || 0) - dt;
       if (this.leadsT <= 0) { this.leadsT = 0.5; this.renderLeads(); this.renderTaskbar(); }
     }
+    if (this.snake && this.wins.snake.open) this.snake.update(dt);
     if (this.hack && this.hack.phase === 'game' && this.needle) {
       const h = this.hack;
       h.pos += h.dir * h.speed * dt;

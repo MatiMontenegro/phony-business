@@ -11,6 +11,7 @@ export class Audio {
     this.ctx = null;
     this.ready = false;
     this.muted = false;
+    this.ducked = false; // on a live call: room noise and music step back
     settings.onChange((p) => { if (p.startsWith('audio.')) this.applyVolumes(); });
   }
 
@@ -46,14 +47,21 @@ export class Audio {
     this.applyVolumes();
   }
 
-  applyVolumes() {
+  applyVolumes(tau = 0.03) {
     if (!this.ready) return;
     const a = settings.data.audio;
     const t = this.ctx.currentTime;
     this.master.gain.setTargetAtTime(this.muted ? 0 : a.master, t, 0.03);
     this.sfx.gain.setTargetAtTime(a.sfx, t, 0.03);
-    this.musicBus.gain.setTargetAtTime(a.music * 0.7, t, 0.03);
-    this.ambBus.gain.setTargetAtTime(a.ambience, t, 0.03);
+    this.musicBus.gain.setTargetAtTime(a.music * 0.7 * (this.ducked ? 0.5 : 1), t, tau);
+    this.ambBus.gain.setTargetAtTime(a.ambience * (this.ducked ? 0.3 : 1), t, tau);
+  }
+
+  // rain, HVAC and music duck under a call so the voices (and the open mic) stay clear
+  setDuck(on) {
+    if (this.ducked === on) return;
+    this.ducked = on;
+    this.applyVolumes(0.35);
   }
 
   get volume() { return settings.data.audio.master; }
@@ -210,14 +218,14 @@ export class Audio {
     env.gain.linearRampToValueAtTime(0, t + 1.25);
   }
 
-  blip(freq = 880, dur = 0.06, type = 'sine', vol = 0.25, pos = null) {
+  blip(freq = 880, dur = 0.06, type = 'sine', vol = 0.25, pos = null, bus = null) {
     if (!this.ready) return;
     const c = this.ctx, t = c.currentTime;
     const osc = c.createOscillator();
     osc.type = type;
     osc.frequency.value = freq;
     const g = c.createGain();
-    osc.connect(g).connect(this.out(pos, vol));
+    osc.connect(g).connect(this.out(pos, vol, bus ? { bus } : {}));
     this.env(g, t, 0.005, 1, dur * 0.3, dur);
     osc.start(t);
     osc.stop(t + dur * 1.5 + 0.05);
@@ -522,23 +530,29 @@ export class Audio {
     og.gain.value = 0.01;
     osc.connect(og).connect(this.ambBus);
     osc.start(t);
+    // rain through the glass: band-limited, with the top end rolled off so it is
+    // a soft wash instead of white-noise hiss
     const rain = this.noiseSrc(true);
     const rbp = c.createBiquadFilter();
     rbp.type = 'bandpass';
-    rbp.frequency.value = 1400;
-    rbp.Q.value = 0.4;
+    rbp.frequency.value = 1000;
+    rbp.Q.value = 0.7;
+    const rlp = c.createBiquadFilter();
+    rlp.type = 'lowpass';
+    rlp.frequency.value = 2600;
     const rg = c.createGain();
     rg.gain.value = 0;
-    rain.connect(rbp).connect(rg).connect(this.ambBus);
+    rain.connect(rbp).connect(rlp).connect(rg).connect(this.ambBus);
     rain.start(t);
     let rainLevel = 0;
+    // keyboard chatter and drops are ambience too (its slider, its ducking)
     const clicks = setInterval(() => {
-      if (Math.random() < 0.55) this.blip(1800 + Math.random() * 1600, 0.01, 'square', 0.012);
-      if (rainLevel > 0 && Math.random() < rainLevel * 0.8) this.blip(4000 + Math.random() * 3000, 0.004, 'sine', 0.02 * rainLevel);
+      if (Math.random() < 0.55) this.blip(1800 + Math.random() * 1600, 0.01, 'square', 0.012, null, this.ambBus);
+      if (rainLevel > 0 && Math.random() < rainLevel * 0.8) this.blip(4000 + Math.random() * 3000, 0.004, 'sine', 0.02 * rainLevel, null, this.ambBus);
     }, 90);
     return {
       stop: () => { hum.stop(); osc.stop(); rain.stop(); clearInterval(clicks); },
-      setRain: (v) => { rainLevel = v; rg.gain.setTargetAtTime(v * 0.18, c.currentTime, 0.5); },
+      setRain: (v) => { rainLevel = v; rg.gain.setTargetAtTime(v * 0.14, c.currentTime, 0.5); },
     };
   }
 }

@@ -8,6 +8,7 @@ import {
   makeReceipt, makeData, dataThreshold, cleanCode, norm, saidValue, tacticsIn, TACTICS, DATA,
 } from '../ai/marks.js';
 import { ScriptedBrain } from '../ai/scripted.js';
+import { rememberTurn } from '../ai/prompt.js';
 import { usage } from '../ai/usage.js';
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -72,6 +73,7 @@ export class Calls {
     this.call = {
       id: ring.id,
       mark,
+      baiter: !!ring.bt, // secretly a scambaiter tonight: fake data, fake payments
       lang: L,
       scenario,
       challenge,
@@ -120,6 +122,7 @@ export class Calls {
     this.call.silence = 0;
     this.markSay(t('backFromHold', this.lang));
     this.notify();
+    this.sendPending();
   }
 
   // got up mid-call
@@ -186,6 +189,11 @@ export class Calls {
 
   addEvent(e) {
     if (this.state !== 'connected' || !this.call) return;
+    // the boss yells a lot: the line only "hears" it once every 45 s
+    if (/boss/i.test(e)) {
+      if (this.call.elapsed - (this.call.bossAt ?? -99) < 45) return;
+      this.call.bossAt = this.call.elapsed;
+    }
     this.call.events.push(e);
     if (/fart/i.test(e)) this.call.fartAt = this.call.elapsed;
     this.call.transcript.push({ who: 'event', text: e });
@@ -219,21 +227,28 @@ export class Calls {
     this.busy = true;
     this.notify();
     this.game.emit('playerSaid', said);
-    let r;
+    let r = null;
     try {
       r = await this.brain.reply(c, said, events, {
         onFirstLine: (l) => { c.earlyLine = l; this.game.speakMark(c.mark, l); },
       });
     } catch (e) {
+      r = await this.handleBrainError(e, c, said, events); // still busy: nothing overlaps
+    } finally {
       this.busy = false;
-      const alt = await this.handleBrainError(e, c, said, events);
-      if (!alt) { this.notify(); return false; }
-      r = alt;
     }
-    this.busy = false;
-    if (this.call === c) this.apply(c, r);
-    if (this.pending && this.state === 'connected') { const p = this.pending; this.pending = ''; setTimeout(() => this.say(p), 50); }
-    return true;
+    if (r && this.call === c) this.apply(c, r);
+    else this.notify();
+    this.sendPending();
+    return !!r;
+  }
+
+  // whatever the player said while the mark was answering is never left hanging
+  sendPending() {
+    if (!this.pending || this.state !== 'connected' || this.busy) return;
+    const p = this.pending;
+    this.pending = '';
+    setTimeout(() => this.say(p), 50);
   }
 
   apply(c, r) {
@@ -257,7 +272,7 @@ export class Calls {
       if (gave.includes(lead.key) || saidValue(line, lead.value)) this.gotData(c, lead);
     }
     if (r.pay > 0) {
-      const fake = !!c.mark.scambaiter;
+      const fake = !!c.baiter;
       const units = fake ? r.pay : Math.min(r.pay, c.budget - c.paidUnits);
       if (units > 0) {
         if (!fake) c.paidUnits += units;
@@ -291,8 +306,19 @@ export class Calls {
   hear(c, lead) {
     if (this.heard.some((h) => h.callId === c.id && h.key === lead.key)) return;
     const L = this.lang;
-    this.heard.unshift({ key: lead.key, value: lead.value, label: lead.short[L], price: lead.price, markName: c.mark.name, fake: !!c.mark.scambaiter, registered: false, sold: false, callId: c.id });
+    this.heard.unshift({ key: lead.key, value: lead.value, label: lead.short[L], price: lead.price, markName: c.mark.name, fake: !!c.baiter, registered: false, sold: false, callId: c.id });
     this.notify();
+  }
+
+  // a little-game milestone (Minesweeper win, Snake score, clips watched) counts
+  // toward the bonus only while a call is live and that is this call's challenge
+  arcadeProgress(app, name, n) {
+    const c = this.call;
+    if (!c || this.state !== 'connected' || c.challengeDone) return;
+    const ch = c.challenge;
+    if (ch.kind !== 'arcade' || ch.app !== app) return;
+    const hit = ch.goal === 'win' ? name === 'win' : (name === 'food' || name === 'watch') && n >= ch.goal;
+    if (hit) this.completeChallenge();
   }
 
   completeChallenge() {
@@ -413,7 +439,8 @@ export class Calls {
     if (!c) return;
     if (c.abort) { try { c.abort.abort(); } catch { /* ignore */ } }
     const L = this.lang;
-    if (c.mark.scambaiter && by === 'me' && c.turns <= 4 && !c.receipt.some((x) => x.amount < 0)) {
+    // hanging up on a scambaiter before they gloat (and before typing their fake receipt) pays
+    if (c.baiter && by === 'me' && !c.revealed && c.turns <= 6 && !c.receipt.some((x) => x.amount < 0)) {
       c.receipt.push({ label: t('baiterDodged', L), amount: 50 });
       this.ledger.push({ label: t('baiterDodged', L), amount: 50 });
       this.game.addMoney(50, 'bonus');
@@ -437,7 +464,9 @@ export class Calls {
   async handleBrainError(e, c, said, events) {
     const L = this.lang;
     const code = e && e.code;
-    if (code === 'cancelled') return null;
+    if (code === 'cancelled' || this.call !== c) return null; // the call ended meanwhile
+    // a free tier saying "slow down" now and then is not the end of the call; credit running out is
+    if (code === 'rate_limited' && (c.rateLimits = (c.rateLimits || 0) + 1) < 3) return this.coverTurn(c, said, events);
     if (code === 'rate_limited' || code === 'no_credit') {
       this.linesDown = true;
       this.game.emit('linesDown', code);
@@ -451,12 +480,16 @@ export class Calls {
       this.game.emit('brainChanged', 'backup');
       return this.backup.reply(c, said, events);
     }
-    if (code === 'refused' || code === 'empty_completion' || code === 'invalid_request') return this.backup.reply(c, said, events);
-    this.game.toast(t('static', L), 'warn');
-    c.transcript.pop();
-    c.turns--;
-    this.game.emit('restoreDraft', said);
-    return null;
+    return this.coverTurn(c, said, events);
+  }
+
+  // the AI did not answer (timeout, network, a garbled reply): the offline brain
+  // answers this one line so the conversation keeps flowing; the AI gets the next
+  async coverTurn(c, said, events) {
+    if (!c.aiHiccup) { c.aiHiccup = true; this.game.toast(t('aiHiccup', this.lang), 'warn'); }
+    const r = await this.backup.reply(c, said, events);
+    if (this.brain !== this.backup) rememberTurn(c, said, events, r);
+    return r;
   }
 
   continueWithBackup() {

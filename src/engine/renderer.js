@@ -13,11 +13,17 @@ import { N8AOPostPass } from 'n8ao';
 import { FloorReflector } from './reflector.js';
 import { settings } from '../settings.js';
 
+// post: false renders straight to the screen (tone mapping in the materials),
+// skipping every full-screen pass: the mobile path. lod: metres within which
+// characters keep their small face/clothing parts. lights: 'full' or 'lite'
+// (no area lights or per-desk monitor glows).
+// Known (pre-existing): ultra logs WebGL 'texture format / sampler type' warnings
+// at startup (N8AO 'Medium'); other levels are clean.
 export const QUALITY_PRESETS = {
-  low: { pixelRatio: 0.75, shadows: false, shadowSize: 1024, ao: null, bloom: true, smaa: false, grain: false, dof: false, reflect: 0, avatar: 'low' },
-  medium: { pixelRatio: 1, shadows: true, shadowSize: 1024, ao: 'Performance', aoHalf: true, bloom: true, smaa: true, grain: true, dof: false, reflect: 0, avatar: 'low' },
-  high: { pixelRatio: 1.5, shadows: true, shadowSize: 2048, ao: 'Low', aoHalf: true, bloom: true, smaa: true, grain: true, dof: true, reflect: 0.35, avatar: 'high' },
-  ultra: { pixelRatio: 2, shadows: true, shadowSize: 4096, ao: 'Medium', aoHalf: false, bloom: true, smaa: true, grain: true, dof: true, reflect: 0.5, avatar: 'high' },
+  low: { pixelRatio: 1, post: false, shadows: false, shadowSize: 1024, ao: null, bloom: false, smaa: false, grain: false, dof: false, reflect: 0, avatar: 'low', lod: 5, lights: 'lite', texScale: 0.6 },
+  medium: { pixelRatio: 1, post: true, shadows: true, shadowSize: 1024, ao: null, bloom: true, smaa: false, grain: false, dof: false, reflect: 0, avatar: 'low', lod: 7, lights: 'lite' },
+  high: { pixelRatio: 1.5, post: true, shadows: true, shadowSize: 2048, ao: 'Low', aoHalf: true, bloom: true, smaa: true, grain: true, dof: true, reflect: 0.35, avatar: 'high', lod: 10, lights: 'full' },
+  ultra: { pixelRatio: 2, post: true, shadows: true, shadowSize: 4096, ao: 'Medium', aoHalf: false, bloom: true, smaa: true, grain: true, dof: true, reflect: 0.5, avatar: 'high', lod: 14, lights: 'full' },
 };
 
 let _sanitize = null;
@@ -60,6 +66,12 @@ export class Renderer {
     this.renderer = r;
     RectAreaLightUniformsLib.init();
     this.scene = new THREE.Scene();
+    // world matrices are refreshed once per frame in render(), not again by
+    // every pass (main, shadows, AO...) that draws the scene
+    this.scene.matrixWorldAutoUpdate = false;
+    // the scene root never moves; if it recomputed its matrix it would force
+    // every frozen (static) object below it to recompute theirs too
+    this.scene.matrixAutoUpdate = false;
     this.camera = new THREE.PerspectiveCamera(settings.get('graphics.fov') || 60, 1, 0.06, 220);
     this.camera.position.set(0, 3, 8);
     const pm = new THREE.PMREMGenerator(r);
@@ -77,6 +89,7 @@ export class Renderer {
     this.dofAmount = 0;
     this.dofFocus = 1;
     this.aberration = 0;
+    this.dynScale = 1; // extra resolution scale the auto-tuner lowers on slow devices
     this.buildComposer();
     this.resize();
     this._onResize = () => this.resize();
@@ -104,6 +117,21 @@ export class Renderer {
     if (this.composer) this.composer.dispose();
     const q = this.quality;
     this.renderer.shadowMap.enabled = q.shadows;
+    const refl = settings.get('graphics.reflections') !== false ? q.reflect : 0;
+    this.reflector.setStrength(refl);
+    this.dof = null;
+    this.aoPass = null;
+    this.bloom = null;
+    this.chroma = null;
+    if (!q.post) {
+      // mobile path: no full-screen passes at all; the materials tone-map and
+      // write sRGB straight to the canvas
+      this.composer = null;
+      this.renderer.toneMapping = THREE.AgXToneMapping;
+      this.renderer.toneMappingExposure = 1.05;
+      return;
+    }
+    this.renderer.toneMapping = THREE.NoToneMapping;
     const c = new EffectComposer(this.renderer, { frameBufferType: THREE.HalfFloatType });
     c.addPass(new RenderPass(this.scene, this.camera));
     this.aoPass = null;
@@ -149,18 +177,29 @@ export class Renderer {
     c.addPass(new EffectPass(this.camera, ...fx));
     if (q.smaa) c.addPass(new EffectPass(this.camera, new SMAAEffect({ preset: SMAAPreset.HIGH })));
     this.composer = c;
-    const refl = settings.get('graphics.reflections') !== false ? q.reflect : 0;
-    this.reflector.setStrength(refl);
   }
 
   setReflections(on) { this.reflector.setStrength(on ? this.quality.reflect : 0); }
 
+  // Compile the scene's shaders now (in parallel where the browser supports it)
+  // so the first frames of play do not stall on them; on phones each compile
+  // can freeze the game for a moment.
+  warm() {
+    this.scene.updateMatrixWorld();
+    try {
+      // without the parallel-compile extension compileAsync only warns; compile once, now
+      if (this.renderer.extensions.has('KHR_parallel_shader_compile')) return this.renderer.compileAsync(this.scene, this.camera).catch(() => {});
+      this.renderer.compile(this.scene, this.camera);
+    } catch { /* warming is only an optimisation */ }
+    return Promise.resolve();
+  }
+
   resize() {
     const w = Math.max(1, this.container.clientWidth), h = Math.max(1, this.container.clientHeight);
-    const pr = Math.min(window.devicePixelRatio || 1, this.quality.pixelRatio);
+    const pr = Math.min(window.devicePixelRatio || 1, this.quality.pixelRatio) * this.dynScale;
     this.renderer.setPixelRatio(pr);
     this.renderer.setSize(w, h, false);
-    this.composer.setSize(w, h);
+    if (this.composer) this.composer.setSize(w, h);
     this.reflector.setSize(w * pr, h * pr);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
@@ -179,6 +218,14 @@ export class Renderer {
     if (on) this.dofFocus = dist;
   }
 
+  // the expensive part of a frame: one matrix refresh, then the passes
+  draw(dt) {
+    this.scene.updateMatrixWorld();
+    this.reflector.update(this.scene, this.camera, this.quality.reflect >= 0.5 ? 1 : 2);
+    if (this.composer) this.composer.render(dt);
+    else this.renderer.render(this.scene, this.camera);
+  }
+
   render(dt) {
     // dof easing
     if (this.dof) {
@@ -187,25 +234,25 @@ export class Renderer {
       this.dof.cocMaterial.focusDistance = this.dofFocus;
       this.dof.cocMaterial.focusRange = 0.35 + this.dofFocus * 0.35;
     }
-    if (this.aberration > 0.001) {
-      this.aberration *= Math.exp(-dt * 5);
-      const a = this.aberration * 0.006;
-      this.chroma.offset.set(a, a * 0.6);
-    } else if (this.chroma.offset.x) this.chroma.offset.set(0, 0);
+    if (this.chroma) {
+      if (this.aberration > 0.001) {
+        this.aberration *= Math.exp(-dt * 5);
+        const a = this.aberration * 0.006;
+        this.chroma.offset.set(a, a * 0.6);
+      } else if (this.chroma.offset.x) this.chroma.offset.set(0, 0);
+    } else this.aberration = 0;
     const cam = this.camera;
     if (this.shake > 0.001) {
       const s = this.shake * 0.12;
       this._shakeOffset.set((Math.random() - 0.5) * s, (Math.random() - 0.5) * s, (Math.random() - 0.5) * s);
       cam.position.add(this._shakeOffset);
       cam.updateMatrixWorld();
-      this.reflector.update(this.scene, cam, this.quality.reflect >= 0.5 ? 1 : 2);
-      this.composer.render(dt);
+      this.draw(dt);
       cam.position.sub(this._shakeOffset);
       this.shake *= Math.exp(-dt * 6);
     } else {
       cam.updateMatrixWorld();
-      this.reflector.update(this.scene, cam, this.quality.reflect >= 0.5 ? 1 : 2);
-      this.composer.render(dt);
+      this.draw(dt);
     }
   }
 }

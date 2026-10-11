@@ -14,6 +14,18 @@ export function canvas(w, h) {
   return c;
 }
 
+// A canvas that drawing code treats as `w`x`h` but that is stored at `scale` of
+// that, to save memory on phones (each desk screen is a canvas plus its GPU
+// copy). Returns the real canvas (for the texture) and a same-sized "view"
+// whose 2D context is pre-scaled, so the drawing code needs no changes.
+export function scaledCanvas(w, h, scale = 1) {
+  if (scale >= 1) { const c = canvas(w, h); return { canvas: c, view: c }; }
+  const c = canvas(Math.round(w * scale), Math.round(h * scale));
+  const g = c.getContext('2d');
+  g.scale(c.width / w, c.height / h);
+  return { canvas: c, view: { width: w, height: h, getContext: () => g } };
+}
+
 export function tex(c, { repeat = null, srgb = true, aniso = 8 } = {}) {
   const t = new THREE.CanvasTexture(c);
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
@@ -217,10 +229,10 @@ export function neon(text, color = '#ff4d5e', w = 1024, h = 256) {
   return tex(c);
 }
 
-export function skyline() {
+export function skyline(scale = 1) {
   const W = 2048, H = 768;
-  const c = canvas(W, H);
-  const g = c.getContext('2d');
+  const { canvas: c, view } = scaledCanvas(W, H, scale);
+  const g = view.getContext('2d');
   const sky = g.createLinearGradient(0, 0, 0, H);
   sky.addColorStop(0, '#0b0a24');
   sky.addColorStop(0.55, '#1d1450');

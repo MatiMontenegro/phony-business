@@ -13,7 +13,7 @@ import { Props } from './world/props.js';
 import { Screens } from './world/screens.js';
 import { Particles } from './fx/particles.js';
 import { Puddles } from './fx/puddles.js';
-import { Character } from './actors/character.js';
+import { Character, cullCharacters } from './actors/character.js';
 import { pumpBuilds, setAvatarDetail } from './actors/avatar.js';
 import { setMaterialQuality } from './actors/materials.js';
 import { encodeLook } from './actors/rig.js';
@@ -25,6 +25,7 @@ import { Calls } from './game/calls.js';
 import { Switchboard } from './game/switchboard.js';
 import { Net, SoloTransport } from './net/net.js';
 import { Voice } from './voice/tts.js';
+import { Voicebox } from './voice/voicebox.js';
 import { Mic, Ears } from './voice/stt.js';
 import { markById, MARKS } from './ai/marks.js';
 import { usage } from './ai/usage.js';
@@ -38,6 +39,7 @@ const _v = new THREE.Vector3();
 const _w = new THREE.Vector3();
 const num = (v, lim = 30) => { const n = +v; return Number.isFinite(n) ? Math.max(-lim, Math.min(lim, n)) : 0; };
 const kb = (a) => keyLabel((settings.data.controls.bindings[a] || [])[0]);
+const shiftSecondsFrom = (min) => (TUNE.shiftChoices.includes(+min) ? +min : TUNE.shiftSeconds / 60) * 60;
 // codes like MOON-4821 are easier to catch when read digit by digit
 // typed shouting: exclamation marks or mostly CAPITALS
 const isShout = (s) => { const t = String(s); const letters = (t.match(/\p{L}/gu) || []).join(''); return /!{1,}/.test(t) || (letters.length >= 4 && letters === letters.toUpperCase()); };
@@ -56,7 +58,8 @@ export class Game {
     this.remotes = new Map();
     this.mode = 'boot';
     this.money = 0;
-    this.shift = { n: 1, t: 0, len: TUNE.shiftSeconds, quota: TUNE.quotaBase, state: 'run', result: null };
+    this.shiftLen = TUNE.shiftSeconds; // seconds per shift in this office (the host's choice)
+    this.shift = { n: 1, t: 0, len: this.shiftLen, quota: TUNE.quotaBase, state: 'run', result: null };
     this.ui = null;
     this.extras = [];
     this.partial = '';
@@ -78,7 +81,8 @@ export class Game {
     this.scene.background = new THREE.Color('#0d0a1f');
     this.scene.fog = new THREE.FogExp2('#120d26', 0.02);
     this.physics = new Physics();
-    this.office = buildOffice(this.scene, this.physics, { lang: this.lang, reflector: this.renderer.reflector });
+    this.office = buildOffice(this.scene, this.physics, { lang: this.lang, reflector: this.renderer.reflector, texScale: QUALITY_PRESETS[q].texScale || 1 });
+    this.office.setLights(QUALITY_PRESETS[q].lights);
     this.props = new Props(this.scene, this.physics, this.office, this.lang);
     this.fx = new Particles(this.scene);
     this.puddles = new Puddles(this.scene);
@@ -87,8 +91,12 @@ export class Game {
     this.audio = new Audio();
     this.music = new HoldMusic(this.audio);
     this.voice = new Voice();
+    this.voicebox = new Voicebox(this.audio);
+    this.voice.useOwn(this.voicebox);
     this.mic = new Mic();
     this.ears = new Ears();
+    // the recognizer only takes words while the level meter hears a voice (not room noise)
+    this.ears.vad = () => this.mic.heardVoice();
     this.calls = new Calls(this);
     this.switchboard = new Switchboard(this);
     this.net = new Net(new SoloTransport());
@@ -97,10 +105,6 @@ export class Game {
     this.boss = new Boss(this);
     this.office.weather.rain = settings.get('graphics.rain') === false ? 0 : 1;
     this.office.weather.onThunder = (power, delay) => this.audio.thunder(power, delay);
-    this.voice.onSpeaking((on) => {
-      // the open mic must not hear the marks talking through the speakers
-      if (on) this.ears.pause(); else setTimeout(() => { if (!this.voice.speaking) this.ears.resume(); }, 250);
-    });
     this.setupHooks();
     this.spawnAmbient();
     this.mode = 'lobby';
@@ -122,9 +126,11 @@ export class Game {
     if (!QUALITY_PRESETS[name]) return;
     setAvatarDetail(QUALITY_PRESETS[name].avatar);
     setMaterialQuality(name);
+    if (!auto) this.renderer.dynScale = 1;
     this.renderer.setQuality(name);
+    this.office.setLights(QUALITY_PRESETS[name].lights);
+    this.renderer.warm();
     this.qualityAuto = auto;
-    if (!auto) this.qualityDone = true;
     this.emit('qualityChanged', name);
   }
 
@@ -206,8 +212,14 @@ export class Game {
     const sp = this.office.spawnPoints[Math.floor(Math.random() * this.office.spawnPoints.length)];
     this.spawnFacingFloor(sp);
     this.mode = 'play';
+    // your shift length applies if you open the office; joining a running one adopts the host's
+    this.born = Date.now();
+    this.shiftLen = shiftSecondsFrom(settings.get('game.shiftMin'));
+    this.shift.len = this.shiftLen;
     this.audio.unlock();
     if (this.mic.stream) this.mic.attach(this.audio.ctx);
+    // the own voice model needs the Voicebox app on this computer (not inside claude.ai)
+    if (this.platform.kind !== 'artifact' && settings.get('voices.own') !== false) this.voicebox.probe();
     this.ambience ||= this.audio.ambience();
     if (this.ambience) this.ambience.setRain(this.office.weather.rain);
     if (settings.get('audio.musicOn') !== false) this.music.start();
@@ -217,6 +229,7 @@ export class Game {
     this.shift.quota = this.quotaFor(1, this.playerCount());
     this.refreshBrain();
     usage.resetShift();
+    this.renderer.warm();
     this.emit('joined');
   }
 
@@ -306,10 +319,12 @@ export class Game {
   // ---- voices ------------------------------------------------------------------------------
   speakMark(mark, text) {
     const spoken = speakable(text);
-    const onstart = () => { this.markSpeaking = true; };
-    const onend = () => { this.markSpeaking = false; };
-    this.voice.speak(spoken, {
-      id: mark.id, lang: this.lang, gender: mark.voice.gender, pitch: mark.voice.pitch, rate: mark.voice.rate, style: mark.voice.style, priority: 2,
+    // the open mic must not hear the mark through the speakers; other voices in
+    // the office (boss, coworkers) never cut what the player is saying
+    const onstart = () => { this.markSpeaking = true; this.ears.pause(); };
+    const onend = () => { this.markSpeaking = false; setTimeout(() => { if (!this.markSpeaking) this.ears.resume(); }, 250); };
+    this.voice.speakAs(mark.id, spoken, {
+      lang: this.lang, gender: mark.voice.gender, pitch: mark.voice.pitch, rate: mark.voice.rate, style: mark.voice.style, priority: 2,
       onstart, onend,
     });
     if (this.ui) this.ui.subtitle(mark.name, text, 'mark');
@@ -350,7 +365,7 @@ export class Game {
       onSend: (s) => { this.partial = ''; if (this.calls.state === 'connected') this.calls.queue(s); },
       onError: (e) => { if (e === 'not-allowed' || e === 'service-not-allowed') this.toast(t('micDenied', this.lang), 'warn'); },
     });
-    if (this.voice.speaking) this.ears.pause();
+    if (this.markSpeaking) this.ears.pause();
   }
 
   stopEars(send = false) { this.ears.stop(send); if (!send) this.partial = ''; }
@@ -585,9 +600,18 @@ export class Game {
     pumpBuilds(this.mode === 'lobby' ? 10 : this.me && !this.me.char.rig.ready ? 14 : 3.5);
     this.update(dt);
     // the full-screen PC covers everything: skip most 3D frames
-    const covered = this.ui && this.ui.desktop.visible;
+    // a phone held upright shows the "rotate" card over a blurred game: draw it
+    // only now and then instead of at full rate (battery, heat)
+    this._portraitMq ||= matchMedia('(pointer: coarse) and (orientation: portrait) and (max-width: 820px)');
+    const covered = (this.ui && this.ui.desktop.visible) || this._portraitMq.matches;
     this.coverT = covered ? (this.coverT || 0) + dt : 0;
-    if (!covered || this.coverT < 0.3 || Math.floor(this.time * 4) !== Math.floor((this.time - dt) * 4)) this.renderer.render(dt);
+    if (!covered || this.coverT < 0.3 || Math.floor(this.time * 4) !== Math.floor((this.time - dt) * 4)) {
+      const cam = this.renderer.camera;
+      cam.updateMatrixWorld();
+      cullCharacters(cam, this.renderer.quality.lod);
+      this.renderer.render(dt);
+    }
+    this.frameStats(dt);
     this.input.endFrame();
   }
 
@@ -649,31 +673,40 @@ export class Game {
     this.screens.update(dt);
     this.office.update(this.time, dt, this.renderer.camera);
     this.audio.setListener(this.renderer.camera);
+    this.audio.setDuck(this.calls.state === 'connected');
     if (this.ambience) this.ambience.setRain(this.office.weather.rain);
     if (this.ui) this.ui.update(dt);
-    this.autoQuality(dt);
   }
 
-  autoQuality(dt) {
-    if (!this.qualityAuto || this.qualityDone || this.test) return;
-    this.perf ||= { t: 0, frames: 0, sum: 0 };
-    const p = this.perf;
+  // Keeps the game smooth on whatever it runs on, for the whole session (not
+  // just the lobby): every ~4 s the real average frame time is checked, and
+  // below ~40 fps the quality steps down (ultra > high > medium > low), then
+  // the resolution (to 65%). It never steps back up by itself, so it does not
+  // flicker between levels; picking a quality in Settings turns it off.
+  frameStats(dt) {
+    if (!this.qualityAuto || this.test) return;
+    const now = performance.now();
+    const p = (this.perf ||= { t: 0, frames: 0, start: now, last: now });
+    const gap = now - p.last;
+    p.last = now;
     p.t += dt;
-    if (p.t < 2) return;
+    // warm-up after start or a change (shader compiles), and pauses (hidden tab) never count
+    if (p.t < 2 || gap > 250) { p.start = now; p.frames = 0; if (gap > 250) p.t = 0; return; }
     p.frames++;
-    p.sum += dt;
-    if (p.t < 5) return;
-    const avg = p.sum / Math.max(1, p.frames);
+    if (now - p.start < 4000) return;
+    if ((now - p.start) / p.frames > 1000 / 40) this.stepDown();
+    this.perf = { t: 0, frames: 0, start: now, last: now };
+  }
+
+  stepDown() {
     const order = ['ultra', 'high', 'medium', 'low'];
     const i = order.indexOf(this.renderer.qualityName);
-    if (avg > 1 / 38 && i < order.length - 1) {
-      this.setQuality(order[i + 1], true);
-      this.perf = { t: 0.5, frames: 0, sum: 0 };
-    } else this.qualityDone = true;
+    if (i >= 0 && i < order.length - 1) { this.setQuality(order[i + 1], true); return; }
+    const r = this.renderer;
+    if (r.dynScale > 0.66) { r.dynScale = Math.max(0.65, +(r.dynScale - 0.15).toFixed(2)); r.resize(); }
   }
 
   updateLobby(dt) {
-    this.autoQuality(dt);
     const k = this.time * 0.05, cam = this.renderer.camera;
     cam.position.set(1.4 + Math.sin(k) * 0.5, 1.75, 8.2 + Math.cos(k) * 0.3);
     cam.lookAt(-1.4, 1.25, 3);
@@ -745,7 +778,7 @@ export class Game {
       oc: +(this.calls.state === 'connected'), ty: +!!c.animState.typing, x: c.rig.expression,
       ch: +(me.charge || 0).toFixed(2), pe: +!!me.peeing, wb: +(me.bladder > 0.85),
       tk: c.speechLevel > 0.15 ? (c.shoutT > 0 ? 2 : 1) : 0,
-      mo: Math.round(this.money), sn: this.shift.n,
+      mo: Math.round(this.money), sn: this.shift.n, bn: this.born,
       st: [this.calls.stats.closed, me.stats.farts, me.stats.pees, me.stats.flops],
     };
     if (this.net.isHost()) {
@@ -777,6 +810,10 @@ export class Game {
         if (hp.sh.n !== s.n) this.resetForShift(hp.sh.n, hp.sh.q);
         if (s.state === 'run') s.t += dt + (num(hp.sh.t, 1e5) - s.t) * Math.min(1, dt * 2);
         s.len = num(hp.sh.len, 1e5) || s.len;
+        if (s.len !== this.shiftLen) {
+          this.shiftLen = s.len;
+          if (!this.toldLen) { this.toldLen = true; this.toast(t('shiftLenHost', this.lang, { n: Math.round(s.len / 60) }), 'info'); }
+        }
         s.quota = num(hp.sh.q, 1e7) || s.quota;
         if (hp.sh.st === 'end' && s.state !== 'end') this.onShiftEnd(hp.sh.r === 'promoted' ? 'promoted' : 'fired');
       } else if (s.state === 'run') s.t += dt;
@@ -787,13 +824,20 @@ export class Game {
     this.shiftClock = { h: Math.floor(mins / 60) % 24, m: Math.floor(mins % 60) };
   }
 
-  quotaFor(n, players) { return Math.round(((TUNE.quotaBase + TUNE.quotaPerExtraPlayer * (players - 1)) * TUNE.quotaGrowth ** (n - 1)) / 50) * 50; }
+  // the quota scales with the shift length (same earning pace for short and long shifts)
+  quotaFor(n, players, len = this.shiftLen) {
+    const k = len / TUNE.shiftSeconds;
+    return Math.max(300, Math.round(((TUNE.quotaBase + TUNE.quotaPerExtraPlayer * (players - 1)) * TUNE.quotaGrowth ** (n - 1) * k) / 50) * 50);
+  }
 
   onMissedCall(deskIndex, who) {
     const d = this.office.desks[deskIndex];
     if (who) this.boss.report('missed', who, d ? d.seat : null);
     this.toast(t('missedCall', this.lang), 'warn');
   }
+
+  // progress from the PC's little games (Minesweeper, Snake, Phony Feed), for the bonus goals
+  onArcade(app, name, n) { this.calls.arcadeProgress(app, name, n); }
 
   onShiftEnd(result) {
     if (this.mode === 'ending') return;
@@ -839,7 +883,7 @@ export class Game {
   }
 
   resetForShift(n, q) {
-    this.shift = { n, t: 0, len: TUNE.shiftSeconds, quota: q, state: 'run', result: null };
+    this.shift = { n, t: 0, len: this.shiftLen, quota: q, state: 'run', result: null };
     this.money = 0;
     this.mode = 'play';
     this.endingCam = false;

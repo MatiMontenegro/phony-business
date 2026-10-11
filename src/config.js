@@ -32,7 +32,8 @@ export const TUNE = {
   slipSpeed: 1.8,
 
   // shift
-  shiftSeconds: 360,
+  shiftSeconds: 360, // the default; whoever opens the office picks one of shiftChoices (minutes)
+  shiftChoices: [3, 5, 6, 8, 10, 15],
   quotaBase: 1400,
   quotaPerExtraPlayer: 900,
   quotaGrowth: 1.35,
@@ -43,6 +44,7 @@ export const TUNE = {
   ringTimeout: 26,
   maxRings: 2,
   silenceNudge: 24,
+  baiterChance: 0.12, // any customer can secretly be a scambaiter
 
   // data entry
   voucherTTL: 90,

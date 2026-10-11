@@ -34,12 +34,12 @@ export const DEFAULTS = {
   quality: null, // null: pick from the device, then auto-tune
   graphics: { reflections: true, rain: true, shake: true, fov: 60, showFps: false },
   audio: { master: 0.9, music: 0.45, sfx: 0.9, voices: 1, ambience: 0.6, musicOn: true },
-  voices: { rate: 1, coworkers: true },
+  voices: { rate: 1, coworkers: true, own: true }, // own: Matías speaks with "Mi Voz" via Voicebox
   mic: { enabled: true, mode: 'open', autoSendMs: 1000 },
   controls: { bindings: DEFAULT_BINDINGS, sensitivity: 1, invertY: false, gamepad: true },
   touch: { side: 'left', size: 140, opacity: 0.8, haptics: true, force: false },
   ai: { provider: 'auto', key: '', model: '', base: '', claudeTier: 'quick' },
-  game: { subtitles: true, nameTags: true },
+  game: { subtitles: true, nameTags: true, shiftMin: 6 }, // shiftMin: shift length when you open the office
 };
 
 function clone(o) { return JSON.parse(JSON.stringify(o)); }

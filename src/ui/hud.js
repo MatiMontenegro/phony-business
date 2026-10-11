@@ -4,6 +4,12 @@ import { $, clear, icon, money, clock } from './dom.js';
 import { t } from '../i18n.js';
 import { keyLabel, settings } from '../settings.js';
 
+// write DOM only when the value changed (the HUD runs every frame)
+function setText(el, v) { if (el._t !== v) { el._t = v; el.textContent = v; } }
+function setAttr(el, k, v) { const c = '_a' + k; if (el[c] !== v) { el[c] = v; el.setAttribute(k, v); } }
+function setStyle(el, k, v) { const c = '_s' + k; if (el[c] !== v) { el[c] = v; el.style[k] = v; } }
+function setClass(el, k, on) { const c = '_c' + k; if (el[c] !== on) { el[c] = on; el.classList.toggle(k, on); } }
+
 function jugSvg() {
   return `<svg width="34" height="54" viewBox="0 0 34 54" aria-hidden="true">
     <defs><clipPath id="jug"><path d="M11 2h12v6c6 2 9 6 9 12v28a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V20c0-6 3-10 9-12z"/></clipPath></defs>
@@ -148,45 +154,52 @@ export class Hud {
     this.fpsT += dt;
     if (this.fpsT > 0.5) {
       this.fpsEl.hidden = !settings.get('graphics.showFps');
-      this.fpsEl.textContent = `${Math.round(this.frames / this.fpsT)} FPS · ${g.renderer.qualityName}`;
+      setText(this.fpsEl, `${Math.round(this.frames / this.fpsT)} FPS · ${g.renderer.qualityName}`);
       this.fpsT = 0;
       this.frames = 0;
     }
-    const team = g.teamMoney();
-    this.setFlaps(money(team) + '|' + money(g.shift.quota));
-    const k = Math.max(0, Math.min(1, team / Math.max(1, g.shift.quota)));
-    this.bar.firstChild.style.width = (k * 100).toFixed(1) + '%';
-    this.bar.classList.toggle('met', team >= g.shift.quota);
-    const left = Math.max(0, g.shift.len - g.shift.t);
-    this.leftEl.firstChild.textContent = clock(left);
-    this.leftEl.lastChild.textContent = t('shiftEnds', L);
-    if (g.shiftClock) {
-      const h = g.shiftClock.h % 12 || 12;
-      this.clockEl.firstChild.textContent = `${h}:${String(g.shiftClock.m).padStart(2, '0')}`;
-      this.clockEl.lastChild.textContent = g.shiftClock.h >= 12 ? 'PM' : 'AM';
-    }
-    // rings
-    const rs = g.switchboard.summary(L);
-    this.ringEl.hidden = !rs;
-    if (rs) this.ringEl.lastChild.textContent = rs;
-    // meters
-    const fill = this.bladder.querySelector('.fill');
-    const b = me.bladder;
-    fill.setAttribute('y', String(54 - b * 50));
-    fill.setAttribute('fill', b > 0.8 ? '#ff4d5e' : b > 0.55 ? '#ffd84d' : '#8fd6ff');
-    this.bladder.classList.toggle('urgent', b > 0.85);
-    this.gasEl.querySelector('.arc').setAttribute('stroke-dashoffset', String(82 - me.gas * 82));
-    this.gasEl.querySelector('.needle').setAttribute('transform', `rotate(${(-90 + me.gas * 180).toFixed(1)} 32 36)`);
-    this.bladderLbl.textContent = t('bladder', L);
-    this.gasLbl.textContent = t('gas', L);
-    const pk = `${kb('pee')}|${kb('fart')}|${L}`;
-    if (this.peeKey.dataset.k !== pk) {
-      this.peeKey.dataset.k = pk;
-      clear(this.peeKey);
-      this.peeKey.append(
-        $('div', {}, $('span', { class: 'kbd', text: kb('pee') }), $('span', { text: t('pee', L) })),
-        $('div', {}, $('span', { class: 'kbd', text: kb('fart') }), $('span', { text: L === 'es' ? 'Pedo' : 'Fart' })),
-      );
+    // the board, clock and meters change slowly: 10 updates a second is plenty
+    this.slowT = (this.slowT || 0) - dt;
+    if (this.slowT <= 0) {
+      this.slowT = 0.1;
+      const team = g.teamMoney();
+      this.setFlaps(money(team) + '|' + money(g.shift.quota));
+      const k = Math.max(0, Math.min(1, team / Math.max(1, g.shift.quota)));
+      setStyle(this.bar.firstChild, 'width', (k * 100).toFixed(1) + '%');
+      setClass(this.bar, 'met', team >= g.shift.quota);
+      const left = Math.max(0, g.shift.len - g.shift.t);
+      setText(this.leftEl.firstChild, clock(left));
+      setText(this.leftEl.lastChild, t('shiftEnds', L));
+      if (g.shiftClock) {
+        const h = g.shiftClock.h % 12 || 12;
+        setText(this.clockEl.firstChild, `${h}:${String(g.shiftClock.m).padStart(2, '0')}`);
+        setText(this.clockEl.lastChild, g.shiftClock.h >= 12 ? 'PM' : 'AM');
+      }
+      // rings
+      const rs = g.switchboard.summary(L);
+      this.ringEl.hidden = !rs;
+      if (rs) setText(this.ringEl.lastChild, rs);
+      // meters
+      this._fill ||= this.bladder.querySelector('.fill');
+      this._arc ||= this.gasEl.querySelector('.arc');
+      this._needle ||= this.gasEl.querySelector('.needle');
+      const b = me.bladder;
+      setAttr(this._fill, 'y', (54 - b * 50).toFixed(1));
+      setAttr(this._fill, 'fill', b > 0.8 ? '#ff4d5e' : b > 0.55 ? '#ffd84d' : '#8fd6ff');
+      setClass(this.bladder, 'urgent', b > 0.85);
+      setAttr(this._arc, 'stroke-dashoffset', (82 - me.gas * 82).toFixed(1));
+      setAttr(this._needle, 'transform', `rotate(${(-90 + me.gas * 180).toFixed(1)} 32 36)`);
+      setText(this.bladderLbl, t('bladder', L));
+      setText(this.gasLbl, t('gas', L));
+      const pk = `${kb('pee')}|${kb('fart')}|${L}`;
+      if (this.peeKey.dataset.k !== pk) {
+        this.peeKey.dataset.k = pk;
+        clear(this.peeKey);
+        this.peeKey.append(
+          $('div', {}, $('span', { class: 'kbd', text: kb('pee') }), $('span', { text: t('pee', L) })),
+          $('div', {}, $('span', { class: 'kbd', text: kb('fart') }), $('span', { text: L === 'es' ? 'Pedo' : 'Fart' })),
+        );
+      }
     }
     // prompt
     const pcOpen = this.ui.desktop && this.ui.desktop.active;
@@ -206,20 +219,22 @@ export class Hud {
     }
     this.setPrompt(items);
     this.charge.hidden = !me.charging;
-    if (me.charging) this.charge.querySelector('i').style.width = (me.charge * 100).toFixed(0) + '%';
-    this.subs.classList.toggle('hide', !!pcOpen);
+    this._chargeBar ||= this.charge.querySelector('i');
+    if (me.charging) setStyle(this._chargeBar, 'width', (me.charge * 100).toFixed(0) + '%');
+    setClass(this.subs, 'hide', !!pcOpen);
     if (this.subT > 0) { this.subT -= dt; if (this.subT <= 0) this.subs.style.opacity = '0'; }
     // mic pill
     const onCall = g.calls.state === 'connected';
     const ms = g.micStatus();
     this.micPill.hidden = !onCall || pcOpen;
     if (onCall) {
-      this.micPill.className = 'micpill ' + ms.kind;
-      this.micLevel.style.width = Math.round(ms.level * 100) + '%';
-      this.micText.textContent = ms.text;
+      const cls = 'micpill ' + ms.kind;
+      if (this.micPill._c !== cls) { this.micPill._c = cls; this.micPill.className = cls; }
+      setStyle(this.micLevel, 'width', Math.round(ms.level * 100) + '%');
+      setText(this.micText, ms.text);
     }
-    this.micBtn.classList.toggle('live', ms.kind === 'listening');
-    this.micBtn.classList.toggle('off', ms.kind === 'off' || ms.kind === 'denied');
+    setClass(this.micBtn, 'live', ms.kind === 'listening');
+    setClass(this.micBtn, 'off', ms.kind === 'off' || ms.kind === 'denied');
     // teammates
     const rem = [...g.remotes.values()];
     const key = rem.map((r) => `${r.id}:${r.name}:${r.mode}:${r.onCall ? 1 : 0}`).join('|') + L;

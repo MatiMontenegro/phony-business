@@ -54,7 +54,9 @@ export class Switchboard {
     const d = idle.length && Math.random() < 0.5 ? idle[Math.floor(Math.random() * idle.length)] : free[Math.floor(Math.random() * free.length)].index;
     const m = pickMark(Math.random, this.lastMark);
     this.lastMark = m.id;
-    const ring = { id: uid(), d, mk: m.id, sc: pickScenario(), ch: CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)].id, age: 0 };
+    // decided here (by the host) so the whole office agrees on who is secretly a scambaiter
+    const bt = Math.random() < TUNE.baiterChance ? 1 : 0;
+    const ring = { id: uid(), d, mk: m.id, sc: pickScenario(), ch: CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)].id, bt, age: 0 };
     this.rings.push(ring);
     this.game.emit('ring', ring);
   }
@@ -116,9 +118,9 @@ export class Switchboard {
     const out = [];
     for (const a of rg.slice(0, 8)) {
       if (!Array.isArray(a)) continue;
-      const [id, d, mk, sc, ch, age] = a;
+      const [id, d, mk, sc, ch, age, bt] = a;
       if (typeof id !== 'string' || !Number.isInteger(d) || !this.game.office.desks[d] || !markById(mk)) continue;
-      out.push({ id: id.slice(0, 8), d, mk, sc: Math.max(0, Math.min(SCENARIOS.length - 1, sc | 0)), ch: String(ch || ''), age: +age || 0 });
+      out.push({ id: id.slice(0, 8), d, mk, sc: Math.max(0, Math.min(SCENARIOS.length - 1, sc | 0)), ch: String(ch || ''), age: +age || 0, bt: bt ? 1 : 0 });
     }
     for (const r of out) if (!this.rings.some((x) => x.id === r.id)) this.game.emit('ring', r);
     this.rings = out;
@@ -126,7 +128,7 @@ export class Switchboard {
     for (const id of this.mine) if (!out.some((r) => r.id === id)) this.mine.delete(id);
   }
 
-  netState() { return this.rings.map((r) => [r.id, r.d, r.mk, r.sc, r.ch, Math.round(r.age)]); }
+  netState() { return this.rings.map((r) => [r.id, r.d, r.mk, r.sc, r.ch, Math.round(r.age), r.bt ? 1 : 0]); }
 
   update(dt) {
     const g = this.game;

@@ -63,7 +63,17 @@ export class Net {
   }
 
   peers() { return this.peerCache.filter((p) => !p.isMe && p.presence && p.presence.v === 2); }
-  hostId() { return [this.selfId, ...this.peers().map((p) => p.id)].sort()[0]; }
+  // the host is whoever opened the office (earliest join time `bn`), so a friend
+  // joining later never takes over the shift clock; ties fall back to the id
+  hostId() {
+    const at = (bn) => (Number.isFinite(bn) ? bn : Infinity);
+    let best = { id: this.selfId, bn: at(this.state.bn) };
+    for (const p of this.peers()) {
+      const c = { id: p.id, bn: at(p.presence.bn) };
+      if (c.bn < best.bn || (c.bn === best.bn && c.id < best.id)) best = c;
+    }
+    return best.id;
+  }
   isHost() { return this.hostId() === this.selfId; }
   hostPresence() {
     const h = this.hostId();

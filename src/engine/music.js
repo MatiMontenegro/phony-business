@@ -33,7 +33,8 @@ export class HoldMusic {
     this.lp.type = 'lowpass';
     this.lp.frequency.value = 12000;
     this.out.connect(this.hp).connect(this.lp).connect(a.musicBus);
-    this.crackle = setInterval(() => { if (Math.random() < 0.5) a.blip(3000 + Math.random() * 4000, 0.004, 'square', 0.02); }, 120);
+    // vinyl crackle rides the music chain (music slider, phone filter, call ducking)
+    this.crackle = setInterval(() => { if (Math.random() < 0.5) a.blip(3000 + Math.random() * 4000, 0.004, 'square', 0.02, null, this.out); }, 120);
     this.playing = true;
     this.nextTime = c.currentTime + 0.1;
     this.timer = setInterval(() => this.schedule(), 25);

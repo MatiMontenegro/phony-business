@@ -26,7 +26,9 @@ export class OpenAIBrain {
     const inChars = messages.reduce((n, t) => n + t.content.length, 0);
     const ac = new AbortController();
     call.abort = ac;
-    const timer = setTimeout(() => ac.abort(), 30000);
+    // free tiers sometimes hang: give up after 15 s and let the backup brain answer this line
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; ac.abort(); }, 15000);
     let res;
     try {
       res = await fetch(this.base + '/chat/completions', {
@@ -38,7 +40,7 @@ export class OpenAIBrain {
     } catch (e) {
       clearTimeout(timer);
       usage.record({ provider: this.provider, inChars, ok: false });
-      const err = new Error(e.name === 'AbortError' ? 'cancelled' : 'upstream_error');
+      const err = new Error(timedOut ? 'timeout' : e.name === 'AbortError' ? 'cancelled' : 'upstream_error');
       err.code = err.message;
       throw err;
     }
@@ -48,7 +50,7 @@ export class OpenAIBrain {
     if (res.status === 429) throw fail('rate_limited');
     if (res.status === 401 || res.status === 403) throw fail('not_granted');
     if (!res.ok) throw fail('upstream_error');
-    const data = await res.json();
+    const data = await res.json().catch(() => { throw fail('upstream_error'); });
     const text = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content || '' : '';
     usage.record({ provider: this.provider, inChars, outChars: text.length });
     const r = parseReply(text, call);
