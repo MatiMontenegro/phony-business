@@ -31,7 +31,15 @@ export class Voicebox {
     this.probing = null;
   }
 
+  // Voicebox lives on the developer's own computer: only look for it when the
+  // game runs there (dev server, localhost or the downloaded file), never on
+  // the public site, where it would just log failed requests for every player
+  get local() {
+    return !!import.meta.env.DEV || location.protocol === 'file:' || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  }
+
   bases() {
+    if (!this.local) return [];
     const out = [];
     if (import.meta.env.DEV || /^https?:$/.test(location.protocol)) out.push(new URL('voicebox', location.href).href.replace(/\/$/, ''));
     out.push(LOCAL);

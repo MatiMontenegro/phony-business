@@ -169,7 +169,7 @@ export class SettingsMenu {
     b.append(this.row(t('voiceRate', L), this.slider('voices.rate', 0.7, 1.4, 0.05, (x) => x.toFixed(2) + '×')));
     b.append(this.row(t('coworkerVoices', L), this.toggle('voices.coworkers')));
     // the developer's own voice model for Matías, through the Voicebox app on this computer
-    if (this.game.platform.kind !== 'artifact') {
+    if (this.game.platform.kind !== 'artifact' && this.game.voicebox.local) {
       const vb = this.game.voicebox;
       const recheck = () => vb.probe().then(() => { if (this.tab === 'voices' && !this.el.hidden) this.render(); });
       b.append($('h4', { text: t('ownTitle', L) }));
