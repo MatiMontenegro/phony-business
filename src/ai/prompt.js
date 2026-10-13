@@ -103,7 +103,11 @@ export function parseReply(text, call) {
     try { st = JSON.parse(mm[0]); } catch { st = {}; }
     said = raw.slice(0, mm.index);
   }
-  said = cleanLine(said.split('\n').filter((l) => l.trim()).join(' ')) || '...';
+  said = cleanLine(said.split('\n').filter((l) => l.trim()).join(' '));
+  // models told to answer in pure JSON (the browser's built-in model) put the
+  // spoken line in a "say" field instead of before the JSON: use that as a fallback
+  if (!said && typeof st.say === 'string') said = cleanLine(st.say);
+  said = said || '...';
   // which fake data items the line just revealed (game-owned: detect by value)
   const gave = openLeads(call).filter((l) => saidValue(raw, l.value)).map((l) => l.key);
   return {

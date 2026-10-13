@@ -37,6 +37,17 @@ export class OpenAIBrain {
         body: JSON.stringify({ model: this.model, messages, temperature: 0.9, max_tokens: 220 }),
         signal: ac.signal,
       });
+      // a connected OpenRouter free model can retire or be busy: fall back once
+      // to the free router, which auto-picks a working free model
+      if (this.provider === 'openrouter' && (res.status === 404 || res.status === 400 || res.status === 429) && this.model !== 'openrouter/free') {
+        this.model = 'openrouter/free';
+        res = await fetch(this.base + '/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(this.key ? { Authorization: 'Bearer ' + this.key } : {}) },
+          body: JSON.stringify({ model: this.model, messages, temperature: 0.9, max_tokens: 220 }),
+          signal: ac.signal,
+        });
+      }
     } catch (e) {
       clearTimeout(timer);
       usage.record({ provider: this.provider, inChars, ok: false });

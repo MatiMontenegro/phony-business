@@ -12,6 +12,8 @@ import { initPhysics } from './engine/physics.js';
 import { Game } from './game.js';
 import { UI } from './ui/ui.js';
 import { detectPlatform, makeNet } from './platform.js';
+import { pendingCode, finish } from './ai/openrouter.js';
+import { probeNano } from './ai/nano.js';
 import { settings } from './settings.js';
 import { t, detectLang } from './i18n.js';
 import { store } from './ui/dom.js';
@@ -49,6 +51,10 @@ async function main() {
   app.innerHTML = '<div class="stage" id="stage"></div>';
   const boot = bootScreen(lang);
   const platform = detectPlatform();
+  // coming back from an OpenRouter sign-in (?code=...): finish it before the brain is built
+  if (platform.kind !== 'artifact' && pendingCode()) { try { await finish(); } catch { /* fall back to offline */ } }
+  // does this browser have its own built-in model? (for the AI settings)
+  if (platform.kind !== 'artifact') probeNano(lang);
   await fonts();
   try {
     await initPhysics();

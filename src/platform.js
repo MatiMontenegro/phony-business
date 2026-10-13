@@ -4,6 +4,7 @@
 import { Net, SoloTransport, RoomTransport, WsTransport, P2PTransport } from './net/net.js';
 import { ClaudeBrain } from './ai/claude.js';
 import { OpenAIBrain } from './ai/openai.js';
+import { NanoBrain, nanoState } from './ai/nano.js';
 import { ScriptedBrain } from './ai/scripted.js';
 import { settings } from './settings.js';
 
@@ -53,6 +54,8 @@ export function makeBrain(p) {
   const a = settings.data.ai;
   if (a.provider === 'none') return new ScriptedBrain();
   if (p.kind === 'artifact') return p.sample ? new ClaudeBrain(p.sample) : new ScriptedBrain();
+  // the browser's own built-in model (Chrome): free, no key, nothing to set up
+  if (a.provider === 'nano' && nanoState() === 'available') return new NanoBrain();
   if (a.provider && a.provider !== 'auto' && a.base && a.model) return new OpenAIBrain({ base: a.base, model: a.model, key: a.key, provider: a.provider });
   return new ScriptedBrain();
 }

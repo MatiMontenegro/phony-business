@@ -5,6 +5,8 @@ import { t } from '../i18n.js';
 import { settings, ACTIONS, keyLabel } from '../settings.js';
 import { MARKS } from '../ai/marks.js';
 import { PROVIDERS } from '../ai/openai.js';
+import { nanoState, probeNano, activateNano } from '../ai/nano.js';
+import { connect as orConnect, connected as orConnected, disconnect as orDisconnect } from '../ai/openrouter.js';
 import { usage } from '../ai/usage.js';
 
 const TABS = ['controls', 'touch', 'audio', 'voices', 'graphics', 'ai', 'game'];
@@ -214,27 +216,11 @@ export class SettingsMenu {
       b.append(this.row(t('aiProvider', L), this.choice('ai.provider', [['auto', t('aiAuto', L)], ['none', t('aiNone', L)]], () => g.refreshBrain())));
       b.append(this.row(t('claudeTier', L), this.choice('ai.claudeTier', [['quick', t('tierQuick', L)], ['default', t('tierDefault', L)]])));
     } else {
-      const sel = $('select', { 'aria-label': t('aiProvider', L) }, $('option', { value: 'none', text: t('aiNone', L) }), ...Object.entries(PROVIDERS).map(([id, x]) => $('option', { value: id, text: x.label })));
-      sel.value = settings.get('ai.provider') === 'auto' ? 'none' : settings.get('ai.provider') || 'none';
-      const key = $('input', { type: 'password', placeholder: t('aiKey', L), value: settings.get('ai.key') || '', autocomplete: 'off', spellcheck: 'false' });
-      const model = $('input', { type: 'text', placeholder: t('aiModel', L), value: settings.get('ai.model') || '', spellcheck: 'false' });
-      const base = $('input', { type: 'text', placeholder: t('aiBase', L), value: settings.get('ai.base') || '', spellcheck: 'false' });
-      const sync = (fromSelect) => {
-        const pr = PROVIDERS[sel.value];
-        if (fromSelect && pr) { model.value = pr.model; base.value = pr.base; key.placeholder = `${t('aiKey', L)} ${pr.keyHint}`; }
-        key.hidden = sel.value === 'none' || sel.value === 'ollama';
-        model.hidden = base.hidden = sel.value === 'none';
-        settings.set('ai.provider', sel.value);
-        settings.set('ai.key', key.value.trim());
-        settings.set('ai.model', model.value.trim());
-        settings.set('ai.base', base.value.trim());
-        g.refreshBrain();
-      };
-      sel.addEventListener('change', () => sync(true));
-      for (const i of [key, model, base]) { i.addEventListener('change', () => sync(false)); i.addEventListener('keydown', (e) => e.stopPropagation()); }
-      key.hidden = sel.value === 'none' || sel.value === 'ollama';
-      model.hidden = base.hidden = sel.value === 'none';
-      b.append(this.row(t('aiProvider', L), $('div', { class: 'aicfg' }, sel, key, model, base)));
+      this.aiOneClick(b, L, g);
+      // advanced: pick a provider and paste a key by hand (collapsed by default)
+      const adv = $('details', { class: 'aiadv' }, $('summary', { text: t('aiAdvanced', L) }));
+      this.aiManual(adv, L, g);
+      b.append(adv);
       // top-up store: buy convenience token packs (+5%). Checkout opens your site.
       b.append($('h4', { text: t('tokenStore', L) }));
       b.append($('p', { class: 'shelp', text: t('storeNote', L) }));
@@ -250,6 +236,70 @@ export class SettingsMenu {
     const pc = usage.perCall();
     if (s.calls) b.append($('p', { class: 'shelp', text: L === 'es' ? `Promedio por llamada: ${pc.requests.toFixed(1)} respuestas, ~${Math.round(pc.tokens).toLocaleString('en-US')} tokens.` : `Average per call: ${pc.requests.toFixed(1)} replies, ~${Math.round(pc.tokens).toLocaleString('en-US')} tokens.` }));
     b.append($('div', { class: 'btnrow left' }, $('button', { class: 'btn small', onclick: () => { usage.resetTotal(); this.render(); } }, t('resetUsage', L))));
+  }
+
+  // the no-fuss choices: the browser's own AI and one-click OpenRouter sign-in
+  aiOneClick(b, L, g) {
+    const current = settings.get('ai.provider');
+    const offline = !current || current === 'none' || current === 'auto';
+    b.append($('p', { class: 'shelp', text: offline ? t('aiPickHelp', L) : '' }));
+
+    // 1) the browser's built-in AI (Chrome on a capable desktop)
+    const ns = nanoState();
+    if (ns !== 'unsupported') {
+      const row = $('div', { class: 'aiopt' }, $('div', {}, $('b', { text: t('aiNanoTitle', L) }), $('small', { text: t('aiNanoHelp', L) })));
+      if (current === 'nano') row.append($('span', { class: 'aion', text: t('aiOn', L) }), $('button', { class: 'btn small', onclick: () => { settings.set('ai.provider', 'none'); g.refreshBrain(); this.render(); } }, t('aiDisconnect', L)));
+      else if (ns === 'available') row.append($('button', { class: 'btn small cash', onclick: () => { settings.set('ai.provider', 'nano'); g.refreshBrain(); this.render(); } }, t('aiUse', L)));
+      else if (ns === 'checking') row.append($('small', { class: 'shelp', text: '…' }));
+      else if (ns === 'unavailable') row.append($('small', { class: 'shelp warn', text: t('aiNanoNo', L) }));
+      else { // downloadable / downloading
+        const btn = $('button', { class: 'btn small' }, t('aiNanoGet', L));
+        btn.addEventListener('click', async () => {
+          btn.disabled = true; btn.textContent = t('aiNanoDl', L);
+          try { await activateNano(L, (p) => { btn.textContent = t('aiNanoDl', L) + ' ' + Math.round(p * 100) + '%'; }); settings.set('ai.provider', 'nano'); g.refreshBrain(); } catch { g.toast(t('aiNanoFail', L), 'warn'); }
+          this.render();
+        });
+        row.append(btn);
+      }
+      b.append(row);
+      if (ns === 'checking') probeNano(L).then(() => { if (this.tab === 'ai' && !this.el.hidden) this.render(); });
+    }
+
+    // 2) OpenRouter one-click sign-in
+    const orRow = $('div', { class: 'aiopt' }, $('div', {}, $('b', { text: t('aiOrTitle', L) }), $('small', { text: t('aiOrHelp', L) })));
+    if (orConnected()) orRow.append($('span', { class: 'aion', text: t('aiOn', L) }), $('button', { class: 'btn small', onclick: () => { orDisconnect(); g.refreshBrain(); this.render(); } }, t('aiDisconnect', L)));
+    else orRow.append($('button', { class: 'btn small cash', onclick: () => orConnect() }, t('aiOrConnect', L)));
+    b.append(orRow);
+
+    // the offline backup is always there
+    b.append($('div', { class: 'aiopt' }, $('div', {}, $('b', { text: t('aiNone', L) }), $('small', { text: t('aiBackupHelp', L) })),
+      current === 'none' ? $('span', { class: 'aion', text: t('aiOn', L) }) : $('button', { class: 'btn small', onclick: () => { settings.set('ai.provider', 'none'); g.refreshBrain(); this.render(); } }, t('aiUse', L))));
+  }
+
+  // the old manual form, now tucked inside "Advanced"
+  aiManual(b, L, g) {
+    const sel = $('select', { 'aria-label': t('aiProvider', L) }, $('option', { value: 'none', text: t('aiNone', L) }), ...Object.entries(PROVIDERS).map(([id, x]) => $('option', { value: id, text: x.label })));
+    const pv = settings.get('ai.provider');
+    sel.value = PROVIDERS[pv] ? pv : 'none';
+    const key = $('input', { type: 'password', placeholder: t('aiKey', L), value: settings.get('ai.key') || '', autocomplete: 'off', spellcheck: 'false' });
+    const model = $('input', { type: 'text', placeholder: t('aiModel', L), value: settings.get('ai.model') || '', spellcheck: 'false' });
+    const base = $('input', { type: 'text', placeholder: t('aiBase', L), value: settings.get('ai.base') || '', spellcheck: 'false' });
+    const sync = (fromSelect) => {
+      const pr = PROVIDERS[sel.value];
+      if (fromSelect && pr) { model.value = pr.model; base.value = pr.base; key.placeholder = `${t('aiKey', L)} ${pr.keyHint}`; }
+      key.hidden = sel.value === 'none' || sel.value === 'ollama';
+      model.hidden = base.hidden = sel.value === 'none';
+      settings.set('ai.provider', sel.value);
+      settings.set('ai.key', key.value.trim());
+      settings.set('ai.model', model.value.trim());
+      settings.set('ai.base', base.value.trim());
+      g.refreshBrain();
+    };
+    sel.addEventListener('change', () => sync(true));
+    for (const i of [key, model, base]) { i.addEventListener('change', () => sync(false)); i.addEventListener('keydown', (e) => e.stopPropagation()); }
+    key.hidden = sel.value === 'none' || sel.value === 'ollama';
+    model.hidden = base.hidden = sel.value === 'none';
+    b.append(this.row(t('aiProvider', L), $('div', { class: 'aicfg' }, sel, key, model, base)));
   }
 
   tab_game(b, L) {

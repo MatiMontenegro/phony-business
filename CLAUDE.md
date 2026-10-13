@@ -14,7 +14,12 @@ Three.js r186 + Rapier (WASM) + postprocessing; Vite 8.
 ## Notas
 - El bundle tiene que ser ASCII en las regex: usar `/\p{M}/gu` y no rangos `̀-ͯ` (el minificador los convierte en bytes crudos).
 - La URL de pago de la tienda de tokens se define al compilar: `VITE_STORE_URL=https://... npm run build` (la comisión es del 5 %, en `src/ai/store.js`).
-- IA: el jugador trae su propio proveedor (Config → IA); sin IA se usa el cerebro offline `src/ai/scripted.js`.
+- IA sin clave (Config → IA, botones de un clic; el campo manual queda en "Avanzado"):
+  - IA del navegador (`src/ai/nano.js`, `NanoBrain`): modelo integrado de Chrome de escritorio (Prompt API / `LanguageModel`). Gratis, sin cuenta, local. `probeNano`/`activateNano` miran disponibilidad y descargan una vez (desde un clic). `makeBrain` la usa con `provider: 'nano'` solo si `nanoState() === 'available'`.
+  - OpenRouter (`src/ai/openrouter.js`): OAuth PKCE (S256). `connect()` manda a openrouter.ai, al volver con `?code=` `main.js` llama `finish()`, que canjea el código por una clave propia (guardada en el browser) y usa `OpenAIBrain` con base `https://openrouter.ai/api/v1` y un modelo `:free`. Si el modelo gratis falla, reintenta una vez con `openrouter/free`.
+  - Las respuestas en JSON puro (nano) ponen la línea hablada en el campo `say`; `parseReply` lo toma como fallback cuando no hay línea antes del JSON.
+  - Cualquier error/timeout de nano u OpenRouter cae en `Calls.coverTurn` (responde el offline ese turno).
+- IA (resto): en claude.ai usa Claude (`sample`); sin IA se usa el cerebro offline `src/ai/scripted.js`.
 - Cerebro offline: conversación con memoria por llamada (`call.sb`: quién llama, por qué, pruebas, la pregunta que el personaje dejó pendiente). Da el dato si la confianza alcanza el umbral, duda y pregunta cerca del umbral, cuestiona y corta lejos de él. Las líneas en español usan `[vos|usted]` según `mark.formal`; ninguna línea se repite en una llamada.
 - Estafas en tono de parodia: todos los datos son claramente falsos (SSN 000-, tarjetas 0000), sin instrucciones reales de estafa ni marcas reales; al final de cada llamada hay un repaso de las señales de alerta.
 - Voces: TTS del navegador, prioriza las voces "Natural"/"Online". Nada de clonar voces de famosos.
